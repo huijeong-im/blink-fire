@@ -1204,7 +1204,7 @@ const HEAD_SENS_Y  = 2.0
 const faceMesh = new FaceMesh({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
 })
-faceMesh.setOptions({ maxNumFaces:2, refineLandmarks:false, minDetectionConfidence:0.6, minTrackingConfidence:0.5 })
+faceMesh.setOptions({ maxNumFaces:2, refineLandmarks:true, minDetectionConfidence:0.6, minTrackingConfidence:0.5 })
 
 function processFace(lm, ch, getBlinkPower, setBlinkPower, getBlinkStart, setBlinkStart, getBlinkType, setBlinkType) {
   // 조준: 코끝 고개 방향 + 적응형 스무딩
