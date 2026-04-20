@@ -2,859 +2,733 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>FINGER SHOOTER</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>BLINK FIRE 🔥</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; overflow: hidden; }
-    #gameCanvas {
-      display: block;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-    }
+    body { background: #000; overflow: hidden; touch-action: none; }
+    #gameCanvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
     #video { display: none; }
     #camCanvas {
-      position: fixed;
-      bottom: 16px;
-      right: 16px;
-      width: 200px;
-      height: 150px;
-      border: 3px solid #222;
-      border-radius: 6px;
-      transform: scaleX(-1);
-      opacity: 0.85;
+      position: fixed; bottom: 12px; right: 12px;
+      width: min(160px, 22vw); height: min(120px, 16.5vw);
+      border: 2px solid #222; border-radius: 6px;
+      transform: scaleX(-1); opacity: 0.8;
     }
+    /* ── 로딩 ── */
     #loading {
-      position: fixed;
-      inset: 0;
-      background: #0a0a1a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-family: monospace;
-      gap: 18px;
-      z-index: 10;
+      position: fixed; inset: 0; background: #0a0a1a;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; color: #fff; font-family: monospace;
+      gap: 16px; z-index: 30;
     }
     #loading.hidden { display: none; }
-    #loading .icon { font-size: 56px; }
-    #loading .title { font-size: 24px; letter-spacing: 4px; color: #ffeb3b; }
-    #loading .sub { font-size: 13px; color: #555; }
-    #loading .hint { font-size: 13px; color: #888; animation: blink 1s infinite; }
+    #loading .icon  { font-size: clamp(40px,8vw,60px); }
+    #loading .title { font-size: clamp(18px,4vw,28px); letter-spacing: 4px; color: #ffeb3b; }
+    #loading .sub   { font-size: 13px; color: #555; }
+    #loading .hint  { font-size: 13px; color: #888; animation: blink 1s infinite; }
+    /* ── 닉네임 입력 ── */
+    #nickOverlay {
+      position: fixed; inset: 0; background: rgba(6,6,15,0.97);
+      display: flex; align-items: center; justify-content: center; z-index: 20;
+    }
+    #nickOverlay.hidden { display: none; }
+    .nick-box {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 20px; padding: 40px 24px; width: min(380px,90vw);
+    }
+    .nick-logo  { font-size: clamp(28px,6vw,48px); color: #ffeb3b;
+                  font-family: monospace; letter-spacing: 4px; }
+    .nick-flame { font-size: clamp(36px,7vw,56px); }
+    .nick-desc  { font-family: monospace; font-size: 12px; color: #555; text-align: center; line-height: 1.8; }
+    #nickInput {
+      background: #111; border: 2px solid #333; border-radius: 8px;
+      color: #fff; font-family: monospace; font-size: clamp(18px,4vw,22px);
+      padding: 14px 20px; text-align: center; width: 100%; outline: none;
+    }
+    #nickInput:focus { border-color: #ffeb3b; }
+    #nickInput::placeholder { color: #444; }
+    #nickBtn {
+      background: #ffeb3b; border: none; border-radius: 8px; color: #000;
+      cursor: pointer; font-family: monospace; font-size: clamp(16px,3.5vw,20px);
+      font-weight: bold; padding: 14px; width: 100%; letter-spacing: 2px;
+    }
+    #nickBtn:active { background: #ffd600; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
   </style>
 </head>
 <body>
-  <div id="loading">
-    <div class="icon">🔫</div>
-    <div class="title">FINGER SHOOTER</div>
-    <div class="sub">카메라 권한을 허용해주세요</div>
-    <div class="hint">잠시 후 얼굴을 카메라에 보여주세요</div>
+
+<div id="loading">
+  <div class="icon">🔥</div>
+  <div class="title">BLINK FIRE</div>
+  <div class="sub">카메라 권한을 허용해주세요</div>
+  <div class="hint">얼굴을 카메라에 보여주세요</div>
+</div>
+
+<div id="nickOverlay" class="hidden">
+  <div class="nick-box">
+    <div class="nick-flame">🔥</div>
+    <div class="nick-logo">BLINK FIRE</div>
+    <div class="nick-desc">
+      고개를 움직여 조준<br>
+      눈 깜빡이면 발사<br>
+      눈 오래 감으면 시작/재시작
+    </div>
+    <input id="nickInput" type="text" placeholder="닉네임 입력 (최대 10자)"
+           maxlength="10" autocomplete="off" autocorrect="off" spellcheck="false">
+    <button id="nickBtn">🔥 START</button>
   </div>
+</div>
 
-  <canvas id="gameCanvas"></canvas>
-  <video id="video" autoplay playsinline muted></video>
-  <canvas id="camCanvas" width="200" height="150"></canvas>
+<canvas id="gameCanvas"></canvas>
+<video id="video" autoplay playsinline muted></video>
+<canvas id="camCanvas" width="200" height="150"></canvas>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
-  <script>
-  // ─── CANVAS SETUP ────────────────────────────────────────────────────────────
-  const canvas   = document.getElementById('gameCanvas')
-  const ctx      = canvas.getContext('2d')
-  const video    = document.getElementById('video')
-  const camCv    = document.getElementById('camCanvas')
-  const camCtx   = camCv.getContext('2d')
-  const loading  = document.getElementById('loading')
+<script>
+// ─── UPSTASH CONFIG ──────────────────────────────────────────────────────────
+// 주의: 이 토큰은 클라이언트에 노출됩니다. 랭킹 전용 키 사용을 권장해요.
+const UPSTASH_URL   = 'https://united-terrapin-99982.upstash.io'
+const UPSTASH_TOKEN = 'gQAAAAAAAYaOAAIncDE4NDIyYmEwMTY3ZWQ0ZDljOWVjNDMyZmEyMTYwMzg0MXAxOTk5ODI'
+const LB_KEY        = 'blinkfire:lb'
 
-  function resize() {
-    canvas.width  = window.innerWidth
-    canvas.height = window.innerHeight
-  }
-  resize()
-  window.addEventListener('resize', resize)
-
-  // ─── PIXEL FONT (5×5 glyphs) ─────────────────────────────────────────────────
-  const FONT = {
-    '0':['111','101','101','101','111'],
-    '1':['010','110','010','010','111'],
-    '2':['111','001','111','100','111'],
-    '3':['111','001','111','001','111'],
-    '4':['101','101','111','001','001'],
-    '5':['111','100','111','001','111'],
-    '6':['111','100','111','101','111'],
-    '7':['111','001','001','001','001'],
-    '8':['111','101','111','101','111'],
-    '9':['111','101','111','001','111'],
-    'A':['111','101','111','101','101'],
-    'B':['110','101','110','101','110'],
-    'C':['111','100','100','100','111'],
-    'D':['110','101','101','101','110'],
-    'E':['111','100','111','100','111'],
-    'F':['111','100','111','100','100'],
-    'G':['111','100','101','101','111'],
-    'H':['101','101','111','101','101'],
-    'I':['111','010','010','010','111'],
-    'K':['101','110','100','110','101'],
-    'L':['100','100','100','100','111'],
-    'M':['101','111','101','101','101'],
-    'N':['101','111','111','101','101'],
-    'O':['111','101','101','101','111'],
-    'P':['111','101','111','100','100'],
-    'R':['111','101','111','110','101'],
-    'S':['111','100','111','001','111'],
-    'T':['111','010','010','010','010'],
-    'U':['101','101','101','101','111'],
-    'V':['101','101','101','010','010'],
-    'W':['101','101','101','111','101'],
-    'X':['101','010','010','010','101'],
-    'Y':['101','101','010','010','010'],
-    'Z':['111','001','010','100','111'],
-    ' ':['000','000','000','000','000'],
-    ':':['000','010','000','010','000'],
-    '!':['010','010','010','000','010'],
-    '-':['000','000','111','000','000'],
-    '+':['000','010','111','010','000'],
-    '/':['001','001','010','100','100'],
-  }
-
-  function drawText(text, x, y, color = '#fff', sz = 2) {
-    text = String(text).toUpperCase()
-    let cx = x
-    for (const ch of text) {
-      const g = FONT[ch] || FONT[' ']
-      g.forEach((row, ry) => {
-        ;[...row].forEach((px, rx) => {
-          if (px === '1') {
-            ctx.fillStyle = color
-            ctx.fillRect(Math.floor(cx + rx * sz), Math.floor(y + ry * sz), sz, sz)
-          }
-        })
-      })
-      cx += (3 + 1) * sz
-    }
-  }
-
-  function textW(text, sz = 2) { return String(text).length * 4 * sz }
-
-  // ─── PIXEL ART SPRITES ──────────────────────────────────────────────────────
-  // Each cell: '.' = transparent, char = color key
-  const SP = {
-    slime: {
-      frames: [
-        ['..GGG...','.GGGGG..','GG.G.GGG','GGGGGGG.','GGGG.GGG','.GGGGG..','..GGG...','........'],
-        ['..GGG...','.GGGGG..','GG.G.GGG','GGGGGGG.','GGG.GGGG','.GGGGG..','..GGG...','........'],
-      ],
-      c: { G: '#4caf50' }, w: 8, h: 8,
-    },
-    bat: {
-      frames: [
-        ['P..PP..P','PPPPPPPP','.PPPPPP.','..PPPP..','...PP...'],
-        ['P..PP..P','.PPPPPP.','..PPPP..','...PP...','....P...'],
-      ],
-      c: { P: '#9c27b0' }, w: 8, h: 5,
-    },
-    skeleton: {
-      frames: [
-        ['.WWWWWW.','W.W..W.W','WWWWWWWW','.W.WW.W.','W.WWWW.W','.W.WW.W.','..W..W..','........'],
-        ['.WWWWWW.','W.W..W.W','WWWWWWWW','.W.WW.W.','WW.WW.WW','.W.WW.W.','..W..W..','........'],
-      ],
-      c: { W: '#eceff1' }, w: 8, h: 8,
-    },
-    heart: {
-      frames: [['.R.R....','RRRRRR..','RRRRRR..','RRRRRR..','RRRRRR..','RRRRRR..','RRRRR...','RRRR....','RR......']],
-      c: { R: '#e53935' }, w: 8, h: 9,
-    },
-  }
-
-  const SC = 5   // sprite scale (pixels per cell)
-  let frameTime = 0
-
-  function drawSprite(key, x, y, frame = 0, tint = null) {
-    const s = SP[key]
-    const art = s.frames[frame % s.frames.length]
-    art.forEach((row, ry) => {
-      ;[...row].forEach((ch, rx) => {
-        if (ch === '.') return
-        ctx.fillStyle = tint ?? s.c[ch] ?? '#fff'
-        ctx.fillRect(Math.floor(x + rx * SC), Math.floor(y + ry * SC), SC, SC)
-      })
+async function upstashGet(...args) {
+  try {
+    const path = args.map(a => encodeURIComponent(String(a))).join('/')
+    const res  = await fetch(`${UPSTASH_URL}/${path}`, {
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
     })
-  }
+    const json = await res.json()
+    return json.result
+  } catch { return null }
+}
 
-  // ─── STARS ───────────────────────────────────────────────────────────────────
-  const stars = Array.from({ length: 100 }, () => ({
-    x: Math.random() * 2000,
-    y: Math.random() * 1200,
-    s: Math.random() < 0.2 ? 2 : 1,
-    v: 0.3 + Math.random() * 0.6,
-    b: 0.3 + Math.random() * 0.7,
+async function submitScore(nick, sc) {
+  // ZADD GT: 더 높은 점수만 업데이트
+  await upstashGet('zadd', LB_KEY, 'gt', sc, nick)
+}
+
+async function fetchLeaderboard() {
+  const raw = await upstashGet('zrevrange', LB_KEY, 0, 14, 'withscores')
+  if (!Array.isArray(raw)) return []
+  const entries = []
+  for (let i = 0; i < raw.length; i += 2) {
+    entries.push({ nick: raw[i], score: Number(raw[i + 1]) })
+  }
+  return entries
+}
+
+// ─── CANVAS SETUP ────────────────────────────────────────────────────────────
+const canvas  = document.getElementById('gameCanvas')
+const ctx     = canvas.getContext('2d')
+const video   = document.getElementById('video')
+const camCv   = document.getElementById('camCanvas')
+const camCtx  = camCv.getContext('2d')
+const loading = document.getElementById('loading')
+const nickOverlay = document.getElementById('nickOverlay')
+const nickInput   = document.getElementById('nickInput')
+const nickBtn     = document.getElementById('nickBtn')
+
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
+resize()
+window.addEventListener('resize', resize)
+
+// ─── PIXEL FONT (5×5) ────────────────────────────────────────────────────────
+const FONT = {
+  '0':['111','101','101','101','111'],'1':['010','110','010','010','111'],
+  '2':['111','001','111','100','111'],'3':['111','001','111','001','111'],
+  '4':['101','101','111','001','001'],'5':['111','100','111','001','111'],
+  '6':['111','100','111','101','111'],'7':['111','001','001','001','001'],
+  '8':['111','101','111','101','111'],'9':['111','101','111','001','111'],
+  'A':['111','101','111','101','101'],'B':['110','101','110','101','110'],
+  'C':['111','100','100','100','111'],'D':['110','101','101','101','110'],
+  'E':['111','100','111','100','111'],'F':['111','100','111','100','100'],
+  'G':['111','100','101','101','111'],'H':['101','101','111','101','101'],
+  'I':['111','010','010','010','111'],'K':['101','110','100','110','101'],
+  'L':['100','100','100','100','111'],'M':['101','111','101','101','101'],
+  'N':['101','111','111','101','101'],'O':['111','101','101','101','111'],
+  'P':['111','101','111','100','100'],'R':['111','101','111','110','101'],
+  'S':['111','100','111','001','111'],'T':['111','010','010','010','010'],
+  'U':['101','101','101','101','111'],'V':['101','101','101','010','010'],
+  'W':['101','101','101','111','101'],'X':['101','010','010','010','101'],
+  'Y':['101','101','010','010','010'],'Z':['111','001','010','100','111'],
+  ' ':['000','000','000','000','000'],':':['000','010','000','010','000'],
+  '!':['010','010','010','000','010'],'-':['000','000','111','000','000'],
+  '+':['000','010','111','010','000'],'/':['001','001','010','100','100'],
+  '.':['000','000','000','000','010'],'#':['010','111','010','111','010'],
+}
+function drawText(text, x, y, color = '#fff', sz = 2) {
+  text = String(text).toUpperCase(); let cx = x
+  for (const ch of text) {
+    const g = FONT[ch] || FONT[' ']
+    g.forEach((row, ry) => [...row].forEach((px, rx) => {
+      if (px === '1') { ctx.fillStyle = color; ctx.fillRect(Math.floor(cx+rx*sz), Math.floor(y+ry*sz), sz, sz) }
+    }))
+    cx += 4 * sz
+  }
+}
+function textW(text, sz = 2) { return String(text).length * 4 * sz }
+
+// ─── SPRITES ─────────────────────────────────────────────────────────────────
+const SP = {
+  slime: {
+    frames: [
+      ['..GGG...','.GGGGG..','GG.G.GGG','GGGGGGG.','GGGG.GGG','.GGGGG..','..GGG...','........'],
+      ['..GGG...','.GGGGG..','GG.G.GGG','GGGGGGG.','GGG.GGGG','.GGGGG..','..GGG...','........'],
+    ], c: { G:'#4caf50' }, w:8, h:8,
+  },
+  bat: {
+    frames: [
+      ['P..PP..P','PPPPPPPP','.PPPPPP.','..PPPP..','...PP...'],
+      ['P..PP..P','.PPPPPP.','..PPPP..','...PP...','....P...'],
+    ], c: { P:'#9c27b0' }, w:8, h:5,
+  },
+  skeleton: {
+    frames: [
+      ['.WWWWWW.','W.W..W.W','WWWWWWWW','.W.WW.W.','W.WWWW.W','.W.WW.W.','..W..W..','........'],
+      ['.WWWWWW.','W.W..W.W','WWWWWWWW','.W.WW.W.','WW.WW.WW','.W.WW.W.','..W..W..','........'],
+    ], c: { W:'#eceff1' }, w:8, h:8,
+  },
+  heart: {
+    frames: [['.R.R....','RRRRRR..','RRRRRR..','RRRRRR..','RRRRRR..','RRRRRR..','RRRRR...','RRRR....','RR......']],
+    c: { R:'#e53935' }, w:8, h:9,
+  },
+}
+const SC = 5
+function drawSprite(key, x, y, frame = 0, tint = null) {
+  const s = SP[key]; const art = s.frames[frame % s.frames.length]
+  art.forEach((row, ry) => [...row].forEach((ch, rx) => {
+    if (ch === '.') return
+    ctx.fillStyle = tint ?? s.c[ch] ?? '#fff'
+    ctx.fillRect(Math.floor(x+rx*SC), Math.floor(y+ry*SC), SC, SC)
   }))
+}
 
-  function updateStars(dt) {
-    for (const st of stars) {
-      st.x -= st.v
-      if (st.x < 0) { st.x = canvas.width; st.y = Math.random() * canvas.height }
+// ─── STARS ───────────────────────────────────────────────────────────────────
+const stars = Array.from({length:100}, () => ({
+  x: Math.random()*2000, y: Math.random()*1200,
+  s: Math.random()<0.2?2:1, v: 0.3+Math.random()*0.6, b: 0.3+Math.random()*0.7,
+}))
+function updateStars(dt) {
+  for (const st of stars) { st.x -= st.v; if (st.x<0) {st.x=canvas.width; st.y=Math.random()*canvas.height} }
+}
+function drawStars() {
+  for (const st of stars) {
+    ctx.fillStyle = `rgba(255,255,255,${st.b})`
+    ctx.fillRect(Math.floor(st.x), Math.floor(st.y), st.s, st.s)
+  }
+}
+
+// ─── GAME STATE ──────────────────────────────────────────────────────────────
+let playerNick    = localStorage.getItem('blinkfire-nick') || ''
+let leaderboard   = []   // [{ nick, score }, ...]
+let lbLoaded      = false
+let scoreSubmitted = false
+
+let state         = 'start'
+let score         = 0
+let lives         = 3
+let wave          = 1
+let enemies       = []
+let particles     = []
+let flashes       = []
+let scorePopups   = []
+let muzzleFlashes = []
+let bulletTrails  = []
+let shockwaves    = []
+let shakeAmount   = 0, shakeX = 0, shakeY = 0
+let crosshair     = { x:-200, y:-200, visible:false }
+let faceVisible   = false
+let isBlinking    = false
+let blinkStart    = 0
+let canShoot      = true
+let flashScreen   = 0
+let waveDelay     = 0
+let spawnTimer    = 0
+let spawned       = 0
+let waveSize      = 6
+let spawnGap      = 1.8
+let gameStartCooldown = 0
+
+const ETYPES = ['slime','bat','skeleton']
+const EHP    = { slime:1, bat:1, skeleton:3 }
+const ESCORE = { slime:10, bat:15, skeleton:30 }
+const ESPEED = { slime:75, bat:130, skeleton:55 }
+const ECOLOR = { slime:'#4caf50', bat:'#9c27b0', skeleton:'#eceff1' }
+
+function waveConfig(w) {
+  waveSize = 5 + w*2; spawnGap = Math.max(0.7, 1.8 - w*0.08)
+}
+function spawnEnemy() {
+  const type = ETYPES[Math.floor(Math.random()*ETYPES.length)]
+  const margin = 60
+  enemies.push({
+    type, x: canvas.width+30, y: margin+Math.random()*(canvas.height-margin*2),
+    hp: EHP[type]+Math.floor(wave/4), maxHp: EHP[type]+Math.floor(wave/4),
+    speed: ESPEED[type]*(1+wave*0.12)*(0.85+Math.random()*0.3),
+    wobble: Math.random()*Math.PI*2, hitFlash:0, animFrame:0, animTimer:0,
+  })
+}
+function spawnParticles(x, y, color, count=14) {
+  for (let i=0; i<count; i++) {
+    const a = Math.random()*Math.PI*2, spd = 60+Math.random()*140
+    particles.push({x,y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd,
+      life:1, decay:1.2+Math.random()*1.2, sz:2+Math.random()*4, color})
+  }
+}
+
+// ─── SHOOT ───────────────────────────────────────────────────────────────────
+function tryShoot(x, y) {
+  if (!canShoot || state !== 'playing') return
+  canShoot = false
+  muzzleFlashes.push({x, y, life:1, size:70})
+  flashScreen = 0.35
+  let hit=false, hitX=0, hitY=y
+  for (let i=enemies.length-1; i>=0; i--) {
+    const e=enemies[i], sw=SP[e.type].w*SC, sh=SP[e.type].h*SC
+    const ex=e.x-sw/2, ey=e.y-sh/2
+    if (x>=ex-8 && x<=ex+sw+8 && y>=ey-8 && y<=ey+sh+8) {
+      e.hp--; e.hitFlash=0.4; hitX=e.x; hitY=e.y
+      if (e.hp<=0) {
+        const pts=ESCORE[e.type]*wave; score+=pts
+        spawnParticles(e.x, e.y, ECOLOR[e.type], 22)
+        shockwaves.push({x:e.x,y:e.y,r:0,life:1,color:ECOLOR[e.type]})
+        shockwaves.push({x:e.x,y:e.y,r:0,life:0.7,color:'#fff'})
+        scorePopups.push({x:e.x,y:e.y-10,text:`+${pts}`,life:1})
+        enemies.splice(i,1); shakeAmount=9
+      } else { shakeAmount=5 }
+      hit=true; break
     }
   }
+  bulletTrails.push({x1:x,y1:y,x2:hit?hitX:0,y2:hitY,life:1})
+  if (!hit) shakeAmount=2
+  setTimeout(() => { canShoot=true }, 300)
+}
 
-  function drawStars() {
-    for (const st of stars) {
-      ctx.fillStyle = `rgba(255,255,255,${st.b})`
-      ctx.fillRect(Math.floor(st.x), Math.floor(st.y), st.s, st.s)
+// ─── GAME LOGIC ──────────────────────────────────────────────────────────────
+function startGame() {
+  if (!playerNick) { showNickOverlay(); return }
+  score=0; lives=3; wave=1
+  enemies=[]; particles=[]; flashes=[]; scorePopups=[]
+  muzzleFlashes=[]; bulletTrails=[]; shockwaves=[]
+  spawned=0; spawnTimer=0; waveDelay=0
+  waveConfig(wave); gameStartCooldown=1.5
+  scoreSubmitted=false; state='playing'
+}
+function nextWave() {
+  wave++; waveConfig(wave); spawned=0; spawnTimer=0; waveDelay=3; state='waveclear'
+}
+function loseLife() {
+  lives--; flashScreen=0.5
+  if (lives<=0) {
+    state='gameover'
+    if (!scoreSubmitted && playerNick && score>0) {
+      scoreSubmitted=true
+      submitScore(playerNick, score).then(() => fetchLeaderboard().then(lb => { leaderboard=lb }))
     }
   }
+}
 
-  // ─── GAME STATE ──────────────────────────────────────────────────────────────
-  let state        = 'start'   // 'start' | 'playing' | 'waveclear' | 'gameover'
-  let score        = 0
-  let lives        = 3
-  let wave         = 1
-  let enemies      = []
-  let particles    = []
-  let flashes      = []         // { x, y, r, a, color }
-  let scorePopups  = []         // { x, y, text, life }
-  let muzzleFlashes = []        // { x, y, life, size }
-  let bulletTrails  = []        // { x1, y1, x2, y2, life }
-  let shockwaves    = []        // { x, y, r, life, color }
-  let shakeAmount   = 0
-  let shakeX = 0, shakeY = 0
-  let crosshair    = { x: -200, y: -200, visible: false }
-  let handVisible  = false
-  let isBlinking   = false   // 현재 눈 감은 상태
-  let blinkStart   = 0       // 눈 감기 시작 시각 (ms)
-  let canShoot     = true
-  let flashScreen  = 0          // full-screen flash alpha
-  let waveDelay    = 0
-  let spawnTimer   = 0
-  let spawned      = 0
-  let waveSize     = 6
-  let spawnGap     = 1.8
-  let gameStartCooldown = 0
-  let faceVisible  = false
+// ─── UPDATE ──────────────────────────────────────────────────────────────────
+function update(dt) {
+  frameTime += dt; gameStartCooldown = Math.max(0, gameStartCooldown-dt)
+  updateStars(dt)
+  if (state==='playing') {
+    spawnTimer -= dt
+    if (spawnTimer<=0 && spawned<waveSize) { spawnEnemy(); spawned++; spawnTimer=spawnGap }
+    for (let i=enemies.length-1; i>=0; i--) {
+      const e=enemies[i]
+      e.wobble += dt*(e.type==='bat'?5:2.5); e.x-=e.speed*dt
+      e.hitFlash=Math.max(0,e.hitFlash-dt*4)
+      e.animTimer+=dt; if(e.animTimer>0.4){e.animTimer=0;e.animFrame++}
+      if (e.x<-60) { enemies.splice(i,1); loseLife() }
+    }
+    if (spawned>=waveSize && enemies.length===0) nextWave()
+  }
+  if (state==='waveclear') { waveDelay-=dt; if(waveDelay<=0) state='playing' }
+  for (let i=particles.length-1;i>=0;i--) {
+    const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=180*dt; p.life-=p.decay*dt
+    if(p.life<=0) particles.splice(i,1)
+  }
+  for (let i=flashes.length-1;i>=0;i--) {
+    const f=flashes[i]; f.r+=200*dt; f.a-=2.5*dt; if(f.a<=0) flashes.splice(i,1)
+  }
+  for (let i=scorePopups.length-1;i>=0;i--) {
+    const p=scorePopups[i]; p.y-=40*dt; p.life-=2*dt; if(p.life<=0) scorePopups.splice(i,1)
+  }
+  flashScreen=Math.max(0,flashScreen-dt*4)
+  shakeAmount=Math.max(0,shakeAmount-dt*40)
+  shakeX = shakeAmount>0.5?(Math.random()-0.5)*shakeAmount:0
+  shakeY = shakeAmount>0.5?(Math.random()-0.5)*shakeAmount:0
+  for (let i=muzzleFlashes.length-1;i>=0;i--) { muzzleFlashes[i].life-=dt*5; if(muzzleFlashes[i].life<=0) muzzleFlashes.splice(i,1) }
+  for (let i=bulletTrails.length-1;i>=0;i--) { bulletTrails[i].life-=dt*5;   if(bulletTrails[i].life<=0) bulletTrails.splice(i,1) }
+  for (let i=shockwaves.length-1;i>=0;i--) {
+    shockwaves[i].r+=280*dt; shockwaves[i].life-=dt*2.5; if(shockwaves[i].life<=0) shockwaves.splice(i,1)
+  }
+}
+let frameTime = 0
 
-  // enemy config
-  const ETYPES  = ['slime', 'bat', 'skeleton']
-  const EHP     = { slime: 1, bat: 1, skeleton: 3 }
-  const ESCORE  = { slime: 10, bat: 15, skeleton: 30 }
-  const ESPEED  = { slime: 75, bat: 130, skeleton: 55 }
-  const ECOLOR  = { slime: '#4caf50', bat: '#9c27b0', skeleton: '#eceff1' }
+// ─── DRAW EFFECTS ────────────────────────────────────────────────────────────
+function drawEnemies() {
+  for (const e of enemies) {
+    const sw=SP[e.type].w*SC, sh=SP[e.type].h*SC
+    const wy=e.type==='bat'?Math.sin(e.wobble)*8:Math.sin(e.wobble)*2
+    const x=Math.floor(e.x-sw/2), y=Math.floor(e.y-sh/2+wy)
+    drawSprite(e.type,x,y,e.animFrame,e.hitFlash>0?'#ffffff':null)
+    if (e.maxHp>1) {
+      ctx.fillStyle='#222'; ctx.fillRect(x,y-8,sw,4)
+      const r=e.hp/e.maxHp
+      ctx.fillStyle=r>0.5?'#4caf50':r>0.25?'#ffeb3b':'#f44336'
+      ctx.fillRect(x,y-8,Math.floor(sw*r),4)
+    }
+  }
+}
+function drawParticles() {
+  for (const p of particles) { ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.color; ctx.fillRect(Math.floor(p.x),Math.floor(p.y),Math.ceil(p.sz),Math.ceil(p.sz)) }
+  ctx.globalAlpha=1
+}
+function drawFlashes() {
+  for (const f of flashes) { ctx.globalAlpha=Math.max(0,f.a); ctx.strokeStyle=f.color; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,Math.PI*2); ctx.stroke() }
+  ctx.globalAlpha=1
+}
+function drawScorePopups() {
+  for (const p of scorePopups) { ctx.globalAlpha=Math.max(0,p.life); drawText(p.text,Math.floor(p.x),Math.floor(p.y),'#ffeb3b',3) }
+  ctx.globalAlpha=1
+}
+function drawMuzzleFlashes() {
+  for (const f of muzzleFlashes) {
+    const a=Math.max(0,f.life), sz=f.size*(1.8-f.life*0.8)
+    const grad=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,sz)
+    grad.addColorStop(0,`rgba(255,255,255,${a})`); grad.addColorStop(0.25,`rgba(255,230,100,${a*0.9})`)
+    grad.addColorStop(0.6,`rgba(255,150,30,${a*0.5})`); grad.addColorStop(1,`rgba(255,80,0,0)`)
+    ctx.globalAlpha=1; ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(f.x,f.y,sz,0,Math.PI*2); ctx.fill()
+    ctx.globalAlpha=a*0.9; ctx.strokeStyle='#ffe57f'; ctx.lineWidth=Math.max(1,3*a)
+    for (let r=0;r<8;r++) {
+      const angle=(r/8)*Math.PI*2, len=sz*(1.4+(r%2)*0.4)
+      ctx.beginPath(); ctx.moveTo(f.x,f.y); ctx.lineTo(f.x+Math.cos(angle)*len,f.y+Math.sin(angle)*len); ctx.stroke()
+    }
+  }
+  ctx.globalAlpha=1
+}
+function drawBulletTrails() {
+  for (const t of bulletTrails) {
+    const a=Math.max(0,t.life)
+    ctx.globalAlpha=a*0.5; ctx.strokeStyle='#fff'; ctx.lineWidth=5*a; ctx.lineCap='round'
+    ctx.beginPath(); ctx.moveTo(t.x1,t.y1); ctx.lineTo(t.x2,t.y2); ctx.stroke()
+    ctx.globalAlpha=a; ctx.strokeStyle='#ffe57f'; ctx.lineWidth=2*a
+    ctx.beginPath(); ctx.moveTo(t.x1,t.y1); ctx.lineTo(t.x2,t.y2); ctx.stroke()
+  }
+  ctx.globalAlpha=1; ctx.lineCap='butt'
+}
+function drawShockwaves() {
+  for (const s of shockwaves) {
+    ctx.globalAlpha=Math.max(0,s.life*0.7); ctx.strokeStyle=s.color; ctx.lineWidth=Math.max(1,4*s.life)
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.stroke()
+  }
+  ctx.globalAlpha=1
+}
+function drawHUD() {
+  const pad=14, sz=3
+  drawText(`SCORE:${score}`, pad, pad, '#fff', sz)
+  const wt=`WAVE ${wave}`
+  drawText(wt, canvas.width/2-textW(wt,sz)/2, pad, '#ffeb3b', sz)
+  if (playerNick) {
+    const nt = playerNick.toUpperCase()
+    drawText(nt, canvas.width/2-textW(nt,2)/2, pad+sz*7, '#888', 2)
+  }
+  for (let i=0;i<3;i++) {
+    const hx=canvas.width-pad-(3-i)*(SP.heart.w*SC+6)
+    drawSprite('heart',hx,pad,0,i<lives?null:'#1a1a2e')
+  }
+}
+function drawCrosshair() {
+  const {x,y}=crosshair, size=18, gap=5
+  const color=(isBlinking&&gameStartCooldown<=0)?'#ff4444':'#00ff88'
+  ctx.fillStyle=color
+  ctx.fillRect(x-size-gap,y-1,size,2); ctx.fillRect(x+gap+1,y-1,size,2)
+  ctx.fillRect(x-1,y-size-gap,2,size); ctx.fillRect(x-1,y+gap+1,2,size)
+  ctx.fillRect(x-2,y-2,4,4)
+  if (isBlinking&&gameStartCooldown<=0) {
+    ctx.globalAlpha=0.25; ctx.fillStyle='#ff4444'
+    ctx.beginPath(); ctx.arc(x,y,28,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1
+  }
+}
+function drawWaveBanner() {
+  const msg=`WAVE  ${wave}  CLEAR!`, sz=5
+  const x=canvas.width/2-textW(msg,sz)/2, y=canvas.height/2-sz*5/2
+  const alpha=Math.min(1,waveDelay)*(waveDelay<1?waveDelay:1)
+  ctx.globalAlpha=alpha
+  drawText(msg,x+2,y+2,'#000',sz); drawText(msg,x,y,'#ffeb3b',sz)
+  ctx.globalAlpha=1
+  const sub='GET READY!', ss=2
+  ctx.globalAlpha=alpha*(0.5+0.5*Math.sin(Date.now()/300))
+  drawText(sub,canvas.width/2-textW(sub,ss)/2,y+sz*7,'#00ff88',ss)
+  ctx.globalAlpha=1
+}
 
-  function waveConfig(w) {
-    waveSize  = 5 + w * 2
-    spawnGap  = Math.max(0.7, 1.8 - w * 0.08)
+// ─── LEADERBOARD DRAW ────────────────────────────────────────────────────────
+function drawLeaderboard(cx, startY, highlightNick) {
+  const sz=2, rowH=14, maxRows=8
+  const title='# RANKING'
+  drawText(title, cx-textW(title,sz)/2, startY, '#ffeb3b', sz)
+  if (leaderboard.length===0) {
+    const e='NO DATA YET'; ctx.globalAlpha=0.4
+    drawText(e, cx-textW(e,sz)/2, startY+20, '#888', sz)
+    ctx.globalAlpha=1; return
+  }
+  leaderboard.slice(0,maxRows).forEach((entry,i) => {
+    const y=startY+16+i*rowH
+    const isMe = entry.nick.toUpperCase()===highlightNick?.toUpperCase()
+    const color = isMe?'#00ff88':'#aaa'
+    const rank  = `${i+1}.`
+    const nick  = entry.nick.toUpperCase().slice(0,8).padEnd(8,' ')
+    const sc    = String(entry.score).padStart(6,' ')
+    const line  = `${rank.padEnd(3,' ')}${nick} ${sc}`
+    if (isMe) {
+      ctx.fillStyle='rgba(0,255,136,0.08)'
+      ctx.fillRect(cx-textW(line,sz)/2-4, y-2, textW(line,sz)+8, sz*5+4)
+    }
+    drawText(line, cx-textW(line,sz)/2, y, color, sz)
+  })
+}
+
+// ─── START SCREEN ────────────────────────────────────────────────────────────
+function drawStartScreen() {
+  const cx=canvas.width/2, cy=canvas.height/2
+
+  const title='BLINK FIRE', ts=6
+  drawText(title, cx-textW(title,ts)/2+3, cy-120+3, '#000', ts)
+  drawText(title, cx-textW(title,ts)/2, cy-120, '#ffeb3b', ts)
+
+  const lines=[
+    {t:'고개를 움직여 조준',   c:'#aaa',s:2},
+    {t:'MOVE YOUR HEAD TO AIM',c:'#555',s:2},
+    {t:'',c:'',s:2},
+    {t:'눈 깜빡이면 발사',    c:'#aaa',s:2},
+    {t:'BLINK TO SHOOT',      c:'#555',s:2},
+  ]
+  lines.forEach((l,i)=>{ if(!l.t)return; drawText(l.t,cx-textW(l.t,l.s)/2,cy-30+i*18,l.c,l.s) })
+
+  const st='BLINK LONG TO START', ss=3
+  ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
+  drawText(st,cx-textW(st,ss)/2,cy+70,'#00ff88',ss)
+  ctx.globalAlpha=1
+
+  // Sprites
+  drawSprite('slime',   cx-80,cy+100)
+  drawSprite('bat',     cx-20,cy+105)
+  drawSprite('skeleton',cx+40,cy+100)
+
+  // Leaderboard
+  drawLeaderboard(cx, cy+145, playerNick)
+}
+
+// ─── GAME OVER SCREEN ────────────────────────────────────────────────────────
+function drawGameOver() {
+  const cx=canvas.width/2, cy=canvas.height/2
+
+  const go='GAME OVER', gs=6
+  drawText(go, cx-textW(go,gs)/2+3, cy-100+3, '#000', gs)
+  drawText(go, cx-textW(go,gs)/2,   cy-100,   '#f44336', gs)
+
+  // Score
+  const sc=`SCORE : ${score}`, ss=3
+  drawText(sc, cx-textW(sc,ss)/2, cy-30, '#fff', ss)
+  const wt=`WAVE : ${wave}`
+  drawText(wt, cx-textW(wt,ss)/2, cy,    '#ffeb3b', ss)
+
+  // Rank highlight
+  const rank=leaderboard.findIndex(e=>e.nick.toUpperCase()===playerNick.toUpperCase())
+  if (rank>=0) {
+    const rt=`YOUR RANK : #${rank+1}`, rs=2
+    drawText(rt, cx-textW(rt,rs)/2, cy+24, '#00ff88', rs)
   }
 
-  function spawnEnemy() {
-    const type = ETYPES[Math.floor(Math.random() * ETYPES.length)]
-    const margin = 60
-    enemies.push({
-      type,
-      x: canvas.width + 30,
-      y: margin + Math.random() * (canvas.height - margin * 2),
-      hp: EHP[type] + Math.floor(wave / 4),
-      maxHp: EHP[type] + Math.floor(wave / 4),
-      speed: ESPEED[type] * (1 + wave * 0.12) * (0.85 + Math.random() * 0.3),
-      wobble: Math.random() * Math.PI * 2,
-      hitFlash: 0,
-      animFrame: 0,
-      animTimer: 0,
+  // Leaderboard
+  drawLeaderboard(cx, cy+42, playerNick)
+
+  // Retry
+  const rtt='BLINK LONG TO RETRY', rs2=2
+  const lbBot=cy+42+16+Math.min(8,leaderboard.length)*14+10
+  ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
+  drawText(rtt, cx-textW(rtt,rs2)/2, lbBot+8, '#00ff88', rs2)
+  ctx.globalAlpha=1
+
+  // Change nick
+  const cn='TAP HERE TO CHANGE NICKNAME', cs=1
+  ctx.globalAlpha=0.3
+  drawText(cn, cx-textW(cn,cs)/2, lbBot+24, '#888', cs)
+  ctx.globalAlpha=1
+}
+
+// ─── MAIN DRAW ───────────────────────────────────────────────────────────────
+function draw() {
+  ctx.fillStyle='#06060f'; ctx.fillRect(0,0,canvas.width,canvas.height)
+  drawStars()
+  if      (state==='start')    drawStartScreen()
+  else if (state==='gameover') drawGameOver()
+  else {
+    ctx.save(); ctx.translate(shakeX,shakeY)
+    drawBulletTrails(); drawEnemies(); drawShockwaves()
+    drawParticles(); drawFlashes(); drawMuzzleFlashes(); drawScorePopups()
+    ctx.restore()
+    drawHUD(); if(state==='waveclear') drawWaveBanner()
+  }
+  if (flashScreen>0) { ctx.fillStyle=`rgba(255,200,100,${flashScreen})`; ctx.fillRect(0,0,canvas.width,canvas.height) }
+  for (let y=0;y<canvas.height;y+=4) { ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(0,y,canvas.width,2) }
+  if (crosshair.visible) drawCrosshair()
+  if (!faceVisible&&(state==='playing'||state==='waveclear')) {
+    const hint='SHOW YOUR FACE', sz=2
+    ctx.globalAlpha=0.4+0.4*Math.sin(Date.now()/500)
+    drawText(hint,canvas.width/2-textW(hint,sz)/2,canvas.height-52,'#888',sz)
+    ctx.globalAlpha=1
+  }
+}
+
+// ─── GAME LOOP ───────────────────────────────────────────────────────────────
+let lastTime=0
+function loop(ts) {
+  const dt=Math.min((ts-lastTime)/1000,0.05); lastTime=ts
+  update(dt); draw(); requestAnimationFrame(loop)
+}
+requestAnimationFrame(loop)
+
+// ─── NICKNAME UI ─────────────────────────────────────────────────────────────
+function showNickOverlay() {
+  nickOverlay.classList.remove('hidden')
+  nickInput.value = playerNick
+  setTimeout(()=>nickInput.focus(), 100)
+}
+function confirmNick() {
+  const n = nickInput.value.trim()
+  if (!n) { nickInput.focus(); return }
+  playerNick = n
+  localStorage.setItem('blinkfire-nick', n)
+  nickOverlay.classList.add('hidden')
+  startGame()
+}
+nickBtn.addEventListener('click', confirmNick)
+nickInput.addEventListener('keydown', e => { if(e.key==='Enter') confirmNick() })
+
+// 게임오버 화면 탭 → 닉네임 변경
+canvas.addEventListener('click', e => {
+  if (state==='gameover') {
+    const cy=canvas.height/2
+    const lbBot=cy+42+16+Math.min(8,leaderboard.length)*14+10
+    if (e.clientY>lbBot+20) { showNickOverlay(); return }
+  }
+  if (!faceVisible) {
+    if (state==='playing') tryShoot(e.clientX,e.clientY)
+    else if (state==='start') { if(playerNick) startGame(); else showNickOverlay() }
+    else if (state==='gameover') { if(playerNick) startGame(); else showNickOverlay() }
+  }
+})
+canvas.addEventListener('mousemove', e => {
+  if (!faceVisible) { crosshair.x=e.clientX; crosshair.y=e.clientY; crosshair.visible=true }
+})
+canvas.addEventListener('mouseleave', () => { if(!faceVisible) crosshair.visible=false })
+// 터치 이벤트 (모바일)
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault()
+  const t=e.touches[0]
+  if (!faceVisible) {
+    if (state==='playing') tryShoot(t.clientX,t.clientY)
+    else showNickOverlay()
+  }
+}, { passive:false })
+
+// ─── MEDIAPIPE FACE MESH ──────────────────────────────────────────────────────
+function eyeAR(lm,top,bot,outer,inner) {
+  const h=Math.hypot(lm[top].x-lm[bot].x,lm[top].y-lm[bot].y)
+  const w=Math.hypot(lm[outer].x-lm[inner].x,lm[outer].y-lm[inner].y)
+  return w>0?h/w:1
+}
+
+const BLINK_THRESH = 0.18
+const HEAD_SENS_X  = 2.2
+const HEAD_SENS_Y  = 2.0
+let noseBaselineEma = null
+
+const faceMesh = new FaceMesh({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
+})
+faceMesh.setOptions({ maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.6, minTrackingConfidence:0.5 })
+
+faceMesh.onResults(results => {
+  camCtx.drawImage(results.image, 0, 0, camCv.width, camCv.height)
+  if (!results.multiFaceLandmarks?.length) {
+    faceVisible=false; crosshair.visible=false; isBlinking=false; return
+  }
+  faceVisible=true
+  const lm=results.multiFaceLandmarks[0]
+
+  // ── 조준: 코끝 고개 방향 + 적응형 스무딩 ──
+  const rawX=((1-lm[1].x)-0.5)*canvas.width*HEAD_SENS_X + canvas.width/2
+  const rawY=(lm[1].y-0.4)*canvas.height*HEAD_SENS_Y + canvas.height/2
+  if (!crosshair.visible) { crosshair.x=rawX; crosshair.y=rawY }
+  else {
+    const dist=Math.hypot(rawX-crosshair.x, rawY-crosshair.y)
+    const smooth=Math.min(0.85, 0.2+dist/120)
+    crosshair.x=smooth*rawX+(1-smooth)*crosshair.x
+    crosshair.y=smooth*rawY+(1-smooth)*crosshair.y
+  }
+  crosshair.visible=true
+
+  // ── 코 찡긋 (Z축 기반) ──
+  const eyeZ=(lm[33].z+lm[362].z)/2, noseFwd=eyeZ-lm[4].z
+  if (noseBaselineEma===null) noseBaselineEma=noseFwd
+  noseBaselineEma=0.98*noseBaselineEma+0.02*noseFwd
+  if (noseFwd>noseBaselineEma+0.014 && canShoot && gameStartCooldown<=0 && state==='playing') {
+    tryShoot(crosshair.x, crosshair.y)
+  }
+
+  // ── 눈 깜빡임 (EAR) ──
+  const avgEAR=(eyeAR(lm,159,145,33,133)+eyeAR(lm,386,374,362,263))/2
+  const nowBlink=avgEAR<BLINK_THRESH
+  isBlinking=nowBlink
+  if (nowBlink && blinkStart===0) blinkStart=Date.now()
+  if (!nowBlink && blinkStart>0) {
+    const dur=Date.now()-blinkStart; blinkStart=0
+    if (dur>60 && dur<450 && gameStartCooldown<=0 && state==='playing') tryShoot(crosshair.x,crosshair.y)
+    else if (dur>=800) {
+      if (state==='start'||state==='gameover') { if(playerNick) startGame(); else showNickOverlay() }
+    }
+  }
+})
+
+// ─── CAMERA (모바일 전면카메라 지원) ────────────────────────────────────────
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode:'user', width:{ideal:640}, height:{ideal:480} }
     })
-  }
-
-  function spawnParticles(x, y, color, count = 14) {
-    for (let i = 0; i < count; i++) {
-      const a = Math.random() * Math.PI * 2
-      const spd = 60 + Math.random() * 140
-      particles.push({
-        x, y,
-        vx: Math.cos(a) * spd,
-        vy: Math.sin(a) * spd,
-        life: 1,
-        decay: 1.2 + Math.random() * 1.2,
-        sz: 2 + Math.random() * 4,
-        color,
-      })
-    }
-  }
-
-  function tryShoot(x, y) {
-    if (!canShoot || state !== 'playing') return
-    canShoot = false
-
-    // 총구 불꽃
-    muzzleFlashes.push({ x, y, life: 1, size: 70 })
-    // 화면 번쩍
-    flashScreen = 0.35
-
-    let hit = false
-    let hitX = 0, hitY = y
-
-    for (let i = enemies.length - 1; i >= 0; i--) {
-      const e = enemies[i]
-      const sw = SP[e.type].w * SC
-      const sh = SP[e.type].h * SC
-      const ex = e.x - sw / 2, ey = e.y - sh / 2
-
-      if (x >= ex - 8 && x <= ex + sw + 8 && y >= ey - 8 && y <= ey + sh + 8) {
-        e.hp--
-        e.hitFlash = 0.4
-        hitX = e.x; hitY = e.y
-        if (e.hp <= 0) {
-          const pts = ESCORE[e.type] * wave
-          score += pts
-          spawnParticles(e.x, e.y, ECOLOR[e.type], 22)
-          // 충격파 링
-          shockwaves.push({ x: e.x, y: e.y, r: 0, life: 1, color: ECOLOR[e.type] })
-          shockwaves.push({ x: e.x, y: e.y, r: 0, life: 0.7, color: '#fff' })
-          scorePopups.push({ x: e.x, y: e.y - 10, text: `+${pts}`, life: 1 })
-          enemies.splice(i, 1)
-          shakeAmount = 9
-        } else {
-          shakeAmount = 5
+    video.srcObject = stream
+    video.addEventListener('loadeddata', async () => {
+      loading.classList.add('hidden')
+      // 닉네임이 없으면 입력 요청
+      if (!playerNick) showNickOverlay()
+      // 초기 랭킹 불러오기
+      fetchLeaderboard().then(lb => { leaderboard=lb; lbLoaded=true })
+      // 프레임 루프
+      async function processFrame() {
+        if (video.readyState>=2) {
+          camCv.width=200; camCv.height=150
+          await faceMesh.send({image:video})
         }
-        hit = true
-        break
+        requestAnimationFrame(processFrame)
       }
-    }
-
-    // 탄환 궤적: 조준점 → 타격지점(or 왼쪽 끝)
-    bulletTrails.push({ x1: x, y1: y, x2: hit ? hitX : 0, y2: hitY, life: 1 })
-    if (!hit) shakeAmount = 2
-
-    setTimeout(() => { canShoot = true }, 300)
-  }
-
-  // ─── GAME LOGIC ──────────────────────────────────────────────────────────────
-  function startGame() {
-    score = 0; lives = 3; wave = 1
-    enemies = []; particles = []; flashes = []; scorePopups = []
-    spawned = 0; spawnTimer = 0; waveDelay = 0
-    waveConfig(wave)
-    gameStartCooldown = 1.5
-    state = 'playing'
-  }
-
-  function nextWave() {
-    wave++
-    waveConfig(wave)
-    spawned = 0; spawnTimer = 0
-    waveDelay = 3
-    state = 'waveclear'
-  }
-
-  function loseLife() {
-    lives--
-    flashScreen = 0.5
-    if (lives <= 0) { state = 'gameover' }
-  }
-
-  function update(dt) {
-    frameTime += dt
-    gameStartCooldown = Math.max(0, gameStartCooldown - dt)
-
-    updateStars(dt)
-
-    if (state === 'playing') {
-      // Spawn
-      spawnTimer -= dt
-      if (spawnTimer <= 0 && spawned < waveSize) {
-        spawnEnemy()
-        spawned++
-        spawnTimer = spawnGap
-      }
-
-      // Enemies
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        const e = enemies[i]
-        e.wobble += dt * (e.type === 'bat' ? 5 : 2.5)
-        e.x -= e.speed * dt
-        e.hitFlash = Math.max(0, e.hitFlash - dt * 4)
-        e.animTimer += dt
-        if (e.animTimer > 0.4) { e.animTimer = 0; e.animFrame++ }
-
-        if (e.x < -60) {
-          enemies.splice(i, 1)
-          loseLife()
-        }
-      }
-
-      // Wave clear
-      if (spawned >= waveSize && enemies.length === 0) {
-        nextWave()
-      }
-    }
-
-    if (state === 'waveclear') {
-      waveDelay -= dt
-      if (waveDelay <= 0) state = 'playing'
-    }
-
-    // Particles
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i]
-      p.x += p.vx * dt; p.y += p.vy * dt
-      p.vy += 180 * dt
-      p.life -= p.decay * dt
-      if (p.life <= 0) particles.splice(i, 1)
-    }
-
-    // Flashes
-    for (let i = flashes.length - 1; i >= 0; i--) {
-      const f = flashes[i]
-      f.r += 200 * dt; f.a -= 2.5 * dt
-      if (f.a <= 0) flashes.splice(i, 1)
-    }
-
-    // Score popups
-    for (let i = scorePopups.length - 1; i >= 0; i--) {
-      const p = scorePopups[i]
-      p.y -= 40 * dt
-      p.life -= 2 * dt
-      if (p.life <= 0) scorePopups.splice(i, 1)
-    }
-
-    // Screen flash decay
-    flashScreen = Math.max(0, flashScreen - dt * 4)
-
-    // Shake decay
-    shakeAmount = Math.max(0, shakeAmount - dt * 40)
-    if (shakeAmount > 0.5) {
-      shakeX = (Math.random() - 0.5) * shakeAmount
-      shakeY = (Math.random() - 0.5) * shakeAmount
-    } else { shakeX = 0; shakeY = 0 }
-
-    // Muzzle flashes
-    for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
-      muzzleFlashes[i].life -= dt * 5   // 0.2초 지속
-      if (muzzleFlashes[i].life <= 0) muzzleFlashes.splice(i, 1)
-    }
-
-    // Bullet trails
-    for (let i = bulletTrails.length - 1; i >= 0; i--) {
-      bulletTrails[i].life -= dt * 5    // 0.2초 지속
-      if (bulletTrails[i].life <= 0) bulletTrails.splice(i, 1)
-    }
-
-    // Shockwaves
-    for (let i = shockwaves.length - 1; i >= 0; i--) {
-      shockwaves[i].r += 280 * dt
-      shockwaves[i].life -= dt * 2.5    // 0.4초 지속
-      if (shockwaves[i].life <= 0) shockwaves.splice(i, 1)
-    }
-  }
-
-  // ─── DRAW ────────────────────────────────────────────────────────────────────
-  function draw() {
-    // Background
-    ctx.fillStyle = '#06060f'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    drawStars()
-
-    if (state === 'start')      drawStartScreen()
-    else if (state === 'gameover') drawGameOver()
-    else {
-      // 화면 흔들림 적용
-      ctx.save()
-      ctx.translate(shakeX, shakeY)
-
-      drawBulletTrails()
-      drawEnemies()
-      drawShockwaves()
-      drawParticles()
-      drawFlashes()
-      drawMuzzleFlashes()
-      drawScorePopups()
-
-      ctx.restore()
-
-      drawHUD()
-      if (state === 'waveclear') drawWaveBanner()
-    }
-
-    // Screen flash
-    if (flashScreen > 0) {
-      ctx.fillStyle = `rgba(255,200,100,${flashScreen})`
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-    }
-
-    // Scanlines (CRT feel)
-    for (let y = 0; y < canvas.height; y += 4) {
-      ctx.fillStyle = 'rgba(0,0,0,0.12)'
-      ctx.fillRect(0, y, canvas.width, 2)
-    }
-
-    // Crosshair (on top of everything)
-    if (crosshair.visible) drawCrosshair()
-
-    // No-hand hint
-    if (!faceVisible && (state === 'playing' || state === 'waveclear')) {
-      const hint = 'SHOW YOUR FACE'
-      const sz = 2
-      const alpha = 0.4 + 0.4 * Math.sin(Date.now() / 500)
-      ctx.globalAlpha = alpha
-      drawText(hint, canvas.width / 2 - textW(hint, sz) / 2, canvas.height - 52, '#888', sz)
-      ctx.globalAlpha = 1
-    }
-  }
-
-  function drawEnemies() {
-    for (const e of enemies) {
-      const sw = SP[e.type].w * SC
-      const sh = SP[e.type].h * SC
-      const wy = e.type === 'bat' ? Math.sin(e.wobble) * 8 : Math.sin(e.wobble) * 2
-      const x = Math.floor(e.x - sw / 2)
-      const y = Math.floor(e.y - sh / 2 + wy)
-      const tint = e.hitFlash > 0 ? '#ffffff' : null
-
-      drawSprite(e.type, x, y, e.animFrame, tint)
-
-      // HP bar for multi-hp enemies
-      if (e.maxHp > 1) {
-        const bw = sw, bh = 4, bx = x, by = y - 8
-        ctx.fillStyle = '#222'
-        ctx.fillRect(bx, by, bw, bh)
-        const ratio = e.hp / e.maxHp
-        ctx.fillStyle = ratio > 0.5 ? '#4caf50' : ratio > 0.25 ? '#ffeb3b' : '#f44336'
-        ctx.fillRect(bx, by, Math.floor(bw * ratio), bh)
-      }
-    }
-  }
-
-  function drawParticles() {
-    for (const p of particles) {
-      ctx.globalAlpha = Math.max(0, p.life)
-      ctx.fillStyle = p.color
-      ctx.fillRect(Math.floor(p.x), Math.floor(p.y), Math.ceil(p.sz), Math.ceil(p.sz))
-    }
-    ctx.globalAlpha = 1
-  }
-
-  function drawFlashes() {
-    for (const f of flashes) {
-      ctx.globalAlpha = Math.max(0, f.a)
-      ctx.strokeStyle = f.color
-      ctx.lineWidth = 3
-      ctx.beginPath()
-      ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2)
-      ctx.stroke()
-    }
-    ctx.globalAlpha = 1
-  }
-
-  function drawScorePopups() {
-    for (const p of scorePopups) {
-      ctx.globalAlpha = Math.max(0, p.life)
-      drawText(p.text, Math.floor(p.x), Math.floor(p.y), '#ffeb3b', 3)
-    }
-    ctx.globalAlpha = 1
-  }
-
-  function drawMuzzleFlashes() {
-    for (const f of muzzleFlashes) {
-      const a = Math.max(0, f.life)
-      const sz = f.size * (1.8 - f.life * 0.8)  // 터지면서 커짐
-      // 중심 글로우
-      const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, sz)
-      grad.addColorStop(0,   `rgba(255,255,255,${a})`)
-      grad.addColorStop(0.25, `rgba(255,230,100,${a * 0.9})`)
-      grad.addColorStop(0.6,  `rgba(255,150,30,${a * 0.5})`)
-      grad.addColorStop(1,    `rgba(255,80,0,0)`)
-      ctx.globalAlpha = 1
-      ctx.fillStyle = grad
-      ctx.beginPath()
-      ctx.arc(f.x, f.y, sz, 0, Math.PI * 2)
-      ctx.fill()
-      // 별 모양 광선 8개
-      ctx.globalAlpha = a * 0.9
-      ctx.strokeStyle = '#ffe57f'
-      ctx.lineWidth = Math.max(1, 3 * a)
-      for (let r = 0; r < 8; r++) {
-        const angle = (r / 8) * Math.PI * 2
-        const len = sz * (1.4 + (r % 2) * 0.4)
-        ctx.beginPath()
-        ctx.moveTo(f.x, f.y)
-        ctx.lineTo(f.x + Math.cos(angle) * len, f.y + Math.sin(angle) * len)
-        ctx.stroke()
-      }
-    }
-    ctx.globalAlpha = 1
-  }
-
-  function drawBulletTrails() {
-    for (const t of bulletTrails) {
-      const a = Math.max(0, t.life)
-      // 외곽 흰색 빔
-      ctx.globalAlpha = a * 0.5
-      ctx.strokeStyle = '#fff'
-      ctx.lineWidth = 5 * a
-      ctx.lineCap = 'round'
-      ctx.beginPath()
-      ctx.moveTo(t.x1, t.y1)
-      ctx.lineTo(t.x2, t.y2)
-      ctx.stroke()
-      // 내부 노란색 빔
-      ctx.globalAlpha = a
-      ctx.strokeStyle = '#ffe57f'
-      ctx.lineWidth = 2 * a
-      ctx.beginPath()
-      ctx.moveTo(t.x1, t.y1)
-      ctx.lineTo(t.x2, t.y2)
-      ctx.stroke()
-    }
-    ctx.globalAlpha = 1
-    ctx.lineCap = 'butt'
-  }
-
-  function drawShockwaves() {
-    for (const s of shockwaves) {
-      ctx.globalAlpha = Math.max(0, s.life * 0.7)
-      ctx.strokeStyle = s.color
-      ctx.lineWidth = Math.max(1, 4 * s.life)
-      ctx.beginPath()
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
-      ctx.stroke()
-    }
-    ctx.globalAlpha = 1
-  }
-
-  function drawHUD() {
-    const pad = 14, sz = 3
-
-    // Score
-    drawText(`SCORE:${score}`, pad, pad, '#fff', sz)
-
-    // Wave
-    const wt = `WAVE ${wave}`
-    drawText(wt, canvas.width / 2 - textW(wt, sz) / 2, pad, '#ffeb3b', sz)
-
-    // Lives (hearts)
-    for (let i = 0; i < 3; i++) {
-      const hx = canvas.width - pad - (3 - i) * (SP.heart.w * SC + 6)
-      drawSprite('heart', hx, pad, 0, i < lives ? null : '#1a1a2e')
-    }
-  }
-
-  function drawCrosshair() {
-    const { x, y } = crosshair
-    const size = 18, gap = 5
-    const color = (isBlinking && gameStartCooldown <= 0) ? '#ff4444' : '#00ff88'
-
-    ctx.fillStyle = color
-    // Horizontal
-    ctx.fillRect(x - size - gap, y - 1, size, 2)
-    ctx.fillRect(x + gap + 1, y - 1, size, 2)
-    // Vertical
-    ctx.fillRect(x - 1, y - size - gap, 2, size)
-    ctx.fillRect(x - 1, y + gap + 1, 2, size)
-    // Center
-    ctx.fillRect(x - 2, y - 2, 4, 4)
-
-    if (isBlinking && gameStartCooldown <= 0) {
-      ctx.globalAlpha = 0.25
-      ctx.fillStyle = '#ff4444'
-      ctx.beginPath()
-      ctx.arc(x, y, 28, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.globalAlpha = 1
-    }
-  }
-
-  function drawWaveBanner() {
-    const msg = `WAVE  ${wave}  CLEAR!`
-    const sz = 5
-    const x = canvas.width / 2 - textW(msg, sz) / 2
-    const y = canvas.height / 2 - sz * 5 / 2
-    const alpha = Math.min(1, waveDelay) * (waveDelay < 1 ? waveDelay : 1)
-    ctx.globalAlpha = alpha
-    // Shadow
-    drawText(msg, x + 2, y + 2, '#000', sz)
-    drawText(msg, x, y, '#ffeb3b', sz)
-    ctx.globalAlpha = 1
-
-    const sub = 'GET READY!'
-    const ss = 2
-    const sx = canvas.width / 2 - textW(sub, ss) / 2
-    ctx.globalAlpha = alpha * (0.5 + 0.5 * Math.sin(Date.now() / 300))
-    drawText(sub, sx, y + sz * 7, '#00ff88', ss)
-    ctx.globalAlpha = 1
-  }
-
-  function drawStartScreen() {
-    const cx = canvas.width / 2, cy = canvas.height / 2
-
-    // Title shadow
-    const title = 'FINGER SHOOTER'
-    const ts = 6
-    drawText(title, cx - textW(title, ts) / 2 + 3, cy - 90 + 3, '#000', ts)
-    drawText(title, cx - textW(title, ts) / 2, cy - 90, '#ffeb3b', ts)
-
-    // Instructions
-    const lines = [
-      { t: '고개를 움직여 조준', c: '#aaa', s: 2 },
-      { t: 'MOVE YOUR HEAD TO AIM', c: '#555', s: 2 },
-      { t: '', c: '', s: 2 },
-      { t: '눈 깜빡이면 발사', c: '#aaa', s: 2 },
-      { t: 'BLINK TO SHOOT', c: '#555', s: 2 },
-    ]
-    lines.forEach((l, i) => {
-      if (!l.t) return
-      drawText(l.t, cx - textW(l.t, l.s) / 2, cy + i * 20, l.c, l.s)
+      processFrame()
     })
-
-    // "Open palm to start" blink
-    const st = 'BLINK LONG TO START'
-    const ss = 3
-    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(Date.now() / 500)
-    drawText(st, cx - textW(st, ss) / 2, cy + 120, '#00ff88', ss)
-    ctx.globalAlpha = 1
-
-    // Sample enemies
-    const ex = cx - 60
-    drawSprite('slime',    ex - 50, cy + 160)
-    drawSprite('bat',      ex + 10, cy + 165)
-    drawSprite('skeleton', ex + 70, cy + 160)
+  } catch(e) {
+    loading.querySelector('.sub').textContent='카메라 오류 — 터치/클릭으로도 플레이 가능해요'
+    loading.querySelector('.hint').textContent='닉네임 입력 후 화면 터치로 시작'
+    setTimeout(()=>{ loading.classList.add('hidden'); showNickOverlay() }, 2000)
+    fetchLeaderboard().then(lb => { leaderboard=lb })
   }
-
-  function drawGameOver() {
-    const cx = canvas.width / 2, cy = canvas.height / 2
-
-    const go = 'GAME OVER'
-    const gs = 6
-    drawText(go, cx - textW(go, gs) / 2 + 3, cy - 70 + 3, '#000', gs)
-    drawText(go, cx - textW(go, gs) / 2, cy - 70, '#f44336', gs)
-
-    const sc = `SCORE : ${score}`
-    const ss = 3
-    drawText(sc, cx - textW(sc, ss) / 2, cy + 10, '#fff', ss)
-
-    const wt = `WAVE : ${wave}`
-    drawText(wt, cx - textW(wt, ss) / 2, cy + 40, '#ffeb3b', ss)
-
-    const rt = 'BLINK LONG TO RETRY'
-    const rs = 3
-    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(Date.now() / 500)
-    drawText(rt, cx - textW(rt, rs) / 2, cy + 90, '#00ff88', rs)
-    ctx.globalAlpha = 1
-  }
-
-  // ─── GAME LOOP ───────────────────────────────────────────────────────────────
-  let lastTime = 0
-  function loop(ts) {
-    const dt = Math.min((ts - lastTime) / 1000, 0.05)
-    lastTime = ts
-    update(dt)
-    draw()
-    requestAnimationFrame(loop)
-  }
-  requestAnimationFrame(loop)
-
-  // ─── MOUSE FALLBACK (테스트용) ────────────────────────────────────────────────
-  // 마우스 폴백 (테스트용)
-  canvas.addEventListener('mousemove', e => {
-    if (!faceVisible) { crosshair.x = e.clientX; crosshair.y = e.clientY; crosshair.visible = true }
-  })
-  canvas.addEventListener('click', e => {
-    if (!faceVisible) {
-      if (state === 'playing') tryShoot(e.clientX, e.clientY)
-      else startGame()
-    }
-  })
-  canvas.addEventListener('mouseleave', () => { if (!faceVisible) crosshair.visible = false })
-
-  // ─── MEDIAPIPE FACE MESH ──────────────────────────────────────────────────────
-  // EAR(Eye Aspect Ratio): 눈 세로/가로 비율 — 낮을수록 눈 감은 것
-  function eyeAR(lm, top, bot, outer, inner) {
-    const h = Math.hypot(lm[top].x - lm[bot].x, lm[top].y - lm[bot].y)
-    const w = Math.hypot(lm[outer].x - lm[inner].x, lm[outer].y - lm[inner].y)
-    return w > 0 ? h / w : 1
-  }
-
-  const BLINK_THRESH   = 0.18   // 이 값 이하면 눈 감은 것으로 판정
-  const SMOOTH         = 0.15   // EMA 스무딩 (낮을수록 부드러움)
-  const FACE_SENS_X    = 2.2    // 좌우 감도
-  const FACE_SENS_Y    = 2.0    // 상하 감도
-
-  const faceMesh = new FaceMesh({
-    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
-  })
-  faceMesh.setOptions({
-    maxNumFaces: 1,
-    refineLandmarks: true,
-    minDetectionConfidence: 0.6,
-    minTrackingConfidence: 0.5,
-  })
-
-  faceMesh.onResults(results => {
-    camCtx.drawImage(results.image, 0, 0, camCv.width, camCv.height)
-
-    if (!results.multiFaceLandmarks?.length) {
-      faceVisible = false
-      crosshair.visible = false
-      isBlinking = false
-      return
-    }
-
-    faceVisible = true
-    const lm = results.multiFaceLandmarks[0]
-
-    // ── 조준: 코끝(1번) 위치로 고개 방향 추적 ──
-    // 코끝이 화면 중앙에 있을 때 조준선이 중앙에 오도록 보정
-    const nose = lm[1]
-    const rawX = ((1 - nose.x) - 0.5) * canvas.width * FACE_SENS_X + canvas.width  / 2
-    const rawY = (nose.y        - 0.4) * canvas.height * FACE_SENS_Y + canvas.height / 2
-
-    if (!crosshair.visible) {
-      crosshair.x = rawX; crosshair.y = rawY
-    } else {
-      crosshair.x = SMOOTH * rawX + (1 - SMOOTH) * crosshair.x
-      crosshair.y = SMOOTH * rawY + (1 - SMOOTH) * crosshair.y
-    }
-    crosshair.visible = true
-
-    // ── 눈 깜빡임 감지 (EAR) ──
-    // 왼눈: top=159, bot=145, outer=33, inner=133
-    // 오른눈: top=386, bot=374, outer=362, inner=263
-    const leftEAR  = eyeAR(lm, 159, 145, 33,  133)
-    const rightEAR = eyeAR(lm, 386, 374, 362, 263)
-    const avgEAR   = (leftEAR + rightEAR) / 2
-    const nowBlink = avgEAR < BLINK_THRESH
-
-    isBlinking = nowBlink
-
-    if (nowBlink && !isBlinking) {
-      // 눈 방금 감음 → 시작 시각 기록
-      blinkStart = Date.now()
-    }
-
-    if (nowBlink && blinkStart === 0) blinkStart = Date.now()
-
-    if (!nowBlink && blinkStart > 0) {
-      const dur = Date.now() - blinkStart
-      blinkStart = 0
-
-      if (dur > 60 && dur < 450 && gameStartCooldown <= 0) {
-        // 빠른 깜빡임 → 발사
-        if (state === 'playing') tryShoot(crosshair.x, crosshair.y)
-      } else if (dur >= 800) {
-        // 오래 감기 → 시작/재시작
-        if (state === 'start' || state === 'gameover') startGame()
-      }
-    }
-  })
-
-  const cam = new Camera(video, {
-    onFrame: async () => {
-      camCv.width = 200; camCv.height = 150
-      await faceMesh.send({ image: video })
-    },
-    width: 640,
-    height: 480,
-  })
-
-  cam.start().then(() => loading.classList.add('hidden'))
-     .catch(() => loading.querySelector('.sub').textContent = '카메라 오류 — 마우스로도 플레이 가능해요')
-  </script>
+}
+startCamera()
+</script>
 </body>
 </html>
