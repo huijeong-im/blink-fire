@@ -242,7 +242,7 @@
 <canvas id="gameCanvas"></canvas>
 <video id="video" autoplay playsinline muted></video>
 <canvas id="camCanvas" width="200" height="150"></canvas>
-<button id="muteBtn">♪</button>
+<button id="muteBtn">♪ ON</button>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -474,7 +474,7 @@ const BGM = (() => {
 const muteBtn = document.getElementById('muteBtn')
 function toggleMute() {
   const muted = BGM.toggle()
-  muteBtn.textContent = muted ? '♪ OFF' : '♪'
+  muteBtn.textContent = muted ? '♪ OFF' : '♪ ON'
   muteBtn.classList.toggle('muted', muted)
 }
 muteBtn.addEventListener('click', toggleMute)
