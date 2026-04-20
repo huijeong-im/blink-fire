@@ -519,6 +519,7 @@ let spawned       = 0
 let waveSize      = 6
 let spawnGap      = 1.8
 let gameStartCooldown = 0
+let gameOverCooldown  = 0   // 게임오버 직후 깜빡임 차단
 
 const ETYPES = ['slime','bat','skeleton']
 const EHP    = { slime:1, bat:1, skeleton:3 }
@@ -616,7 +617,11 @@ function loseLife() {
     SFX.gameOver()
     BGM.stop()
     state='gameover'
-    fetchLeaderboard().then(lb => { leaderboard=lb; showScoreOverlay() })
+    gameOverCooldown = 3.0   // 3초간 깜빡임 차단
+    fetchLeaderboard().then(lb => {
+      leaderboard=lb
+      setTimeout(showScoreOverlay, 3000)   // 3초 후 닉네임 화면 표시
+    })
   } else {
     SFX.loseLife()
   }
@@ -624,7 +629,9 @@ function loseLife() {
 
 // ─── UPDATE ──────────────────────────────────────────────────────────────────
 function update(dt) {
-  frameTime += dt; gameStartCooldown = Math.max(0, gameStartCooldown-dt)
+  frameTime += dt
+  gameStartCooldown = Math.max(0, gameStartCooldown-dt)
+  gameOverCooldown  = Math.max(0, gameOverCooldown-dt)
   updateStars(dt)
   if (state==='playing') {
     spawnTimer -= dt
@@ -1080,7 +1087,7 @@ function processFace(lm, ch, getBlinkPower, setBlinkPower, getBlinkStart, setBli
   if (!nowBlink && bs>0) {
     const dur=Date.now()-bs; setBlinkStart(0)
     if (dur>60&&dur<450&&gameStartCooldown<=0&&state==='playing') tryShoot(ch.x,ch.y,getBlinkType())
-    else if (dur>=800 && (state==='start'||state==='gameover') && scoreOverlay.classList.contains('hidden')) startGame()
+    else if (dur>=800 && gameOverCooldown<=0 && (state==='start'||state==='gameover') && scoreOverlay.classList.contains('hidden')) startGame()
     setBlinkType(0)
   }
 }
