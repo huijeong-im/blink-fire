@@ -393,6 +393,7 @@ function _beep(freq, dur, vol=0.3, type='square', freqEnd=null) {
   o.start(); o.stop(_ac.currentTime+dur)
 }
 function _seq(notes) {   // [{f, d, v?, t?}]
+  if (_soundMuted) return
   let t=_ac.currentTime
   notes.forEach(n => {
     const o=_ac.createOscillator(), g=_ac.createGain()
