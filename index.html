@@ -959,30 +959,33 @@ function drawLeaderboard(cx, startY, highlightNick, maxRows=20) {
   const entries = leaderboard.slice(0, maxRows)
   const twoCol = entries.length > 10
   const half = twoCol ? Math.ceil(entries.length / 2) : entries.length
-  const colW = 150  // 각 열 너비
+
+  // 열 중심을 캔버스 너비 기준으로 계산 (겹침 방지)
+  const colL = canvas.width * 0.27
+  const colR = canvas.width * 0.73
 
   ctx.font = font
   entries.forEach((entry, i) => {
     const col   = twoCol ? (i < half ? 0 : 1) : 0
     const row   = twoCol ? (i < half ? i : i - half) : i
-    const colCx = twoCol ? cx - colW/2 + col * colW : cx
+    const colCx = twoCol ? (col === 0 ? colL : colR) : cx
     const y     = startY + 26 + row * rowH
     const isMe  = highlightNick && entry.nick.toLowerCase() === highlightNick.toLowerCase()
     const color = isMe ? '#00ff88' : (i===0?'#ffd700': i===1?'#c0c0c0': i===2?'#cd7f32':'#bbb')
 
     if (isMe) {
       ctx.fillStyle = 'rgba(0,255,136,0.10)'
-      ctx.fillRect(colCx-95, y-13, 190, rowH)
+      ctx.fillRect(colCx-52, y-13, 104, rowH)
     }
 
     ctx.fillStyle = color
     ctx.textAlign = 'right'
-    ctx.fillText(`${i+1}.`, colCx-68, y)
+    ctx.fillText(`${i+1}.`, colCx-30, y)
     ctx.textAlign = 'left'
-    const displayNick = entry.nick.length > 7 ? entry.nick.slice(0,7)+'…' : entry.nick
-    ctx.fillText(displayNick, colCx-60, y)
+    const displayNick = entry.nick.length > 6 ? entry.nick.slice(0,6)+'…' : entry.nick
+    ctx.fillText(displayNick, colCx-22, y)
     ctx.textAlign = 'right'
-    ctx.fillText(entry.score.toLocaleString(), colCx+90, y)
+    ctx.fillText(entry.score.toLocaleString(), colCx+52, y)
   })
   ctx.textAlign = 'left'
 }
