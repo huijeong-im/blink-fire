@@ -646,15 +646,8 @@ function tryShoot(x, y, power = 1) {
   setTimeout(() => { canShoot=true }, rapidTimer>0 ? 80 : isStrong ? 400 : 250)
 }
 
-// ─── PAUSE ───────────────────────────────────────────────────────────────────
-function togglePause() {
-  if (state !== 'playing' && state !== 'waveclear') return
-  paused = !paused
-  if (paused) _ac.suspend()
-  else        _ac.resume()
-}
 window.addEventListener('keydown', e => {
-  if (e.code === 'Space') { e.preventDefault(); togglePause() }
+  if (e.code === 'Space') { e.preventDefault() }
 })
 
 // ─── ITEM LOGIC ──────────────────────────────────────────────────────────────
@@ -900,7 +893,7 @@ function drawHUD() {
   }
 }
 function drawCrosshair(ch, power, p2=false) {
-  const {x,y}=ch, size=18, gap=5
+  const {x,y}=ch, size=26, gap=6
   const strong = power>=2 && gameStartCooldown<=0
   const weak   = power===1 && gameStartCooldown<=0
   // P1: 초록/노랑/주황  P2: 하늘/분홍/빨강
@@ -1074,17 +1067,6 @@ function draw() {
   if (itemFlash.alpha>0) { ctx.fillStyle=`rgba(${hexToRgb(itemFlash.color)},${itemFlash.alpha.toFixed(2)})`; ctx.fillRect(0,0,canvas.width,canvas.height) }
   if (flashScreen>0) { ctx.fillStyle=`rgba(255,200,100,${flashScreen})`; ctx.fillRect(0,0,canvas.width,canvas.height) }
   for (let y=0;y<canvas.height;y+=4) { ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(0,y,canvas.width,2) }
-  if (paused) {
-    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,canvas.width,canvas.height)
-    const cx=canvas.width/2, cy=canvas.height/2
-    const pt='PAUSED', ps=6
-    drawText(pt, cx-textW(pt,ps)/2+3, cy-40+3, '#000', ps)
-    drawText(pt, cx-textW(pt,ps)/2,   cy-40,   '#ffeb3b', ps)
-    const hint='SPACE OR LONG BLINK TO RESUME', hs=2
-    ctx.globalAlpha=0.6+0.4*Math.sin(Date.now()/500)
-    drawText(hint, cx-textW(hint,hs)/2, cy+20, '#aaa', hs)
-    ctx.globalAlpha=1
-  }
   if (crosshair.visible)  drawCrosshair(crosshair,  blinkPower,  false)
   if (crosshair2.visible) drawCrosshair(crosshair2, blinkPower2, true)
   if (!faceVisible && !face2Visible && (state==='playing'||state==='waveclear')) {
@@ -1234,8 +1216,7 @@ function processFace(lm, ch, getBlinkPower, setBlinkPower, getBlinkStart, setBli
     const dur=Date.now()-bs; setBlinkStart(0)
     if (dur>60&&dur<450&&gameStartCooldown<=0&&state==='playing') tryShoot(ch.x,ch.y,getBlinkType())
     else if (dur>=800 && gameOverCooldown<=0) {
-      if (state==='playing' || state==='waveclear') togglePause()
-      else if ((state==='start'||state==='gameover') && scoreOverlay.classList.contains('hidden')) startGame()
+      if ((state==='start'||state==='gameover') && scoreOverlay.classList.contains('hidden')) startGame()
     }
     setBlinkType(0)
   }
