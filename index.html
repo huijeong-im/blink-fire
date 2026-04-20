@@ -564,29 +564,45 @@ function drawWaveBanner() {
 }
 
 // ─── LEADERBOARD DRAW ────────────────────────────────────────────────────────
-function drawLeaderboard(cx, startY, highlightNick) {
-  const sz=2, rowH=14, maxRows=8
-  const title='# RANKING'
-  drawText(title, cx-textW(title,sz)/2, startY, '#ffeb3b', sz)
+// ctx.fillText 사용 — 한글 포함 모든 닉네임 표시 가능
+function drawLeaderboard(cx, startY, highlightNick, maxRows=8) {
+  const rowH=18, font='13px "Courier New", monospace'
+  ctx.font = '700 11px "Courier New", monospace'
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#ffeb3b'
+  ctx.fillText('# RANKING', cx, startY+10)
+
   if (leaderboard.length===0) {
-    const e='NO DATA YET'; ctx.globalAlpha=0.4
-    drawText(e, cx-textW(e,sz)/2, startY+20, '#888', sz)
-    ctx.globalAlpha=1; return
+    ctx.globalAlpha=0.4; ctx.fillStyle='#888'
+    ctx.font = font
+    ctx.fillText('NO DATA YET', cx, startY+28)
+    ctx.globalAlpha=1; ctx.textAlign='left'; return
   }
-  leaderboard.slice(0,maxRows).forEach((entry,i) => {
-    const y=startY+16+i*rowH
-    const isMe = entry.nick.toUpperCase()===highlightNick?.toUpperCase()
-    const color = isMe?'#00ff88':'#aaa'
-    const rank  = `${i+1}.`
-    const nick  = entry.nick.toUpperCase().slice(0,8).padEnd(8,' ')
-    const sc    = String(entry.score).padStart(6,' ')
-    const line  = `${rank.padEnd(3,' ')}${nick} ${sc}`
+
+  ctx.font = font
+  leaderboard.slice(0, maxRows).forEach((entry, i) => {
+    const y = startY + 26 + i * rowH
+    const isMe = highlightNick && entry.nick.toLowerCase() === highlightNick.toLowerCase()
+    const color = isMe ? '#00ff88' : (i===0?'#ffd700': i===1?'#c0c0c0': i===2?'#cd7f32':'#888')
+
     if (isMe) {
-      ctx.fillStyle='rgba(0,255,136,0.08)'
-      ctx.fillRect(cx-textW(line,sz)/2-4, y-2, textW(line,sz)+8, sz*5+4)
+      ctx.fillStyle = 'rgba(0,255,136,0.10)'
+      ctx.fillRect(cx-130, y-13, 260, rowH)
     }
-    drawText(line, cx-textW(line,sz)/2, y, color, sz)
+
+    ctx.fillStyle = color
+    // 순위 (왼쪽 고정)
+    ctx.textAlign = 'right'
+    ctx.fillText(`${i+1}.`, cx-98, y)
+    // 닉네임 (중앙 왼쪽)
+    ctx.textAlign = 'left'
+    const displayNick = entry.nick.length > 10 ? entry.nick.slice(0,10)+'…' : entry.nick
+    ctx.fillText(displayNick, cx-90, y)
+    // 점수 (오른쪽 고정)
+    ctx.textAlign = 'right'
+    ctx.fillText(entry.score.toLocaleString(), cx+130, y)
   })
+  ctx.textAlign = 'left'
 }
 
 // ─── START SCREEN ────────────────────────────────────────────────────────────
@@ -647,7 +663,7 @@ function drawGameOver() {
   drawLeaderboard(cx, cy+42, playerNick)
 
   // Retry — 오버레이가 닫힌 후에만 표시
-  const lbBot=cy+42+16+Math.min(8,leaderboard.length)*14+10
+  const lbBot = cy+42 + 26 + Math.min(8, leaderboard.length)*18 + 10
   if (document.getElementById('scoreOverlay').classList.contains('hidden')) {
     const rtt='BLINK LONG TO RETRY', rs2=2
     ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
