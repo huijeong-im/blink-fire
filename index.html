@@ -381,7 +381,9 @@ function drawStars() {
 // ─── SOUND ENGINE (Web Audio API 칩튠) ───────────────────────────────────────
 const _ac = new (window.AudioContext || window.webkitAudioContext)()
 
+let _soundMuted = false
 function _beep(freq, dur, vol=0.3, type='square', freqEnd=null) {
+  if (_soundMuted) return
   const o=_ac.createOscillator(), g=_ac.createGain()
   o.connect(g); g.connect(_ac.destination)
   o.type=type; o.frequency.setValueAtTime(freq, _ac.currentTime)
@@ -465,7 +467,7 @@ const BGM = (() => {
   return {
     start()  { if(active)return; active=true; _ac.resume().then(()=>scheduleLoop(_ac.currentTime+0.1)) },
     stop()   { active=false; clearTimeout(loopTimer) },
-    toggle() { muted=!muted; return muted },
+    toggle() { muted=!muted; _soundMuted=muted; return muted },
     isMuted(){ return muted },
   }
 })()
