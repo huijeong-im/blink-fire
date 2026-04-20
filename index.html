@@ -109,10 +109,14 @@
       font-family: var(--px); font-size: 7px;
       color: var(--yellow); letter-spacing: 3px; margin-bottom: 7px;
     }
-    #lbPreview .lb-cols  { display: flex; gap: 12px; }
-    #lbPreview .lb-col   { flex: 1; }
-    #lbPreview .lb-rows  { font-family: var(--ko); font-size: 11px; line-height: 2; color: #bbb; }
-    #lbPreview .lb-me    { color: var(--green); }
+    #lbPreview .lb-cols  { display: flex; gap: 8px; }
+    #lbPreview .lb-col   { flex: 1; min-width: 0; }
+    #lbPreview .lb-rows  { font-family: var(--ko); font-size: 11px; line-height: 1.85; color: #bbb; }
+    #lbPreview .lb-row   { display: flex; justify-content: space-between; gap: 4px; }
+    #lbPreview .lb-row .lb-rank { color: #666; flex-shrink: 0; }
+    #lbPreview .lb-row .lb-nick { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #lbPreview .lb-row .lb-sc   { flex-shrink: 0; text-align: right; }
+    #lbPreview .lb-me    { color: var(--green) !important; }
 
     /* 입력창 */
     #nickInput {
@@ -1111,11 +1115,13 @@ function renderLbPreview() {
   const rowsB = document.getElementById('lbRowsB')
   if (!leaderboard.length) { rowsA.textContent = '아직 기록이 없어요'; rowsB.textContent=''; return }
   const makeRow = (e, i) => {
-    const rank = `${i+1}.`
-    const nick = e.nick.slice(0, 7)
-    const sc   = e.score.toLocaleString()
     const isMe = playerNick && e.nick.toUpperCase() === playerNick.toUpperCase()
-    return `<div class="${isMe?'lb-me':''}">${rank} ${nick} <span style="float:right">${sc}</span></div>`
+    const cls  = isMe ? 'lb-row lb-me' : 'lb-row'
+    return `<div class="${cls}">
+      <span class="lb-rank">${i+1}.</span>
+      <span class="lb-nick">${e.nick.slice(0,8)}</span>
+      <span class="lb-sc">${e.score.toLocaleString()}</span>
+    </div>`
   }
   rowsA.innerHTML = leaderboard.slice(0, 10).map(makeRow).join('')
   rowsB.innerHTML = leaderboard.slice(10, 20).map((e,i) => makeRow(e, i+10)).join('')
