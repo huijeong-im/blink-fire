@@ -1204,7 +1204,7 @@ const HEAD_SENS_Y  = 2.0
 const faceMesh = new FaceMesh({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
 })
-faceMesh.setOptions({ maxNumFaces:2, refineLandmarks:true, minDetectionConfidence:0.6, minTrackingConfidence:0.5 })
+faceMesh.setOptions({ maxNumFaces:2, refineLandmarks:false, minDetectionConfidence:0.6, minTrackingConfidence:0.5 })
 
 function processFace(lm, ch, getBlinkPower, setBlinkPower, getBlinkStart, setBlinkStart, getBlinkType, setBlinkType) {
   // 조준: 코끝 고개 방향 + 적응형 스무딩
@@ -1277,12 +1277,19 @@ function startCamera() {
 
   camCv.width = 200; camCv.height = 150   // 한 번만 설정 (매 프레임 설정 시 캔버스 지워짐)
 
+  let _mpBusy = false   // 이전 프레임 처리 중이면 skip (카메라 멈춤 방지)
   const cam = new Camera(video, {
     onFrame: async () => {
-      camCtx.drawImage(video, 0, 0, camCv.width, camCv.height)
-      await faceMesh.send({ image: video })
+      if (_mpBusy) return
+      _mpBusy = true
+      try {
+        camCtx.drawImage(video, 0, 0, camCv.width, camCv.height)
+        await faceMesh.send({ image: video })
+      } finally {
+        _mpBusy = false
+      }
     },
-    width: 640, height: 480,
+    width: 480, height: 360,
   })
 
   cam.start()
