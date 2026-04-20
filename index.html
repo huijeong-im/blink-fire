@@ -385,11 +385,16 @@ let bulletTrails  = []
 let shockwaves    = []
 let shakeAmount   = 0, shakeX = 0, shakeY = 0
 let crosshair     = { x:-200, y:-200, visible:false }
+let crosshair2    = { x:-200, y:-200, visible:false }
 let faceVisible   = false
+let face2Visible  = false
 let isBlinking    = false
 let blinkPower    = 0    // 0=none 1=weak(윙크) 2=strong(양쪽)
 let blinkStart    = 0
 let blinkType     = 0    // 발사 타입 기록용
+let blinkPower2   = 0
+let blinkStart2   = 0
+let blinkType2    = 0
 let canShoot      = true
 let flashScreen   = 0
 let comboCount    = 0
@@ -630,22 +635,30 @@ function drawHUD() {
     ctx.fillStyle=barColor; ctx.fillRect(bx,by,Math.floor(bw*ratio),bh)
   }
 }
-function drawCrosshair() {
-  const {x,y}=crosshair, size=18, gap=5
-  const strong = blinkPower>=2 && gameStartCooldown<=0
-  const weak   = blinkPower===1 && gameStartCooldown<=0
-  const color  = strong ? '#ff8c00' : weak ? '#ffeb3b' : '#00ff88'
+function drawCrosshair(ch, power, p2=false) {
+  const {x,y}=ch, size=18, gap=5
+  const strong = power>=2 && gameStartCooldown<=0
+  const weak   = power===1 && gameStartCooldown<=0
+  // P1: 초록/노랑/주황  P2: 하늘/분홍/빨강
+  const baseColor  = p2 ? '#00e5ff' : '#00ff88'
+  const weakColor  = p2 ? '#ff6ec7' : '#ffeb3b'
+  const strongColor= p2 ? '#ff1744' : '#ff8c00'
+  const color = strong ? strongColor : weak ? weakColor : baseColor
   ctx.fillStyle=color
   ctx.fillRect(x-size-gap,y-1,size,2); ctx.fillRect(x+gap+1,y-1,size,2)
   ctx.fillRect(x-1,y-size-gap,2,size); ctx.fillRect(x-1,y+gap+1,2,size)
   ctx.fillRect(x-2,y-2,4,4)
+  // 플레이어 라벨
+  const label = p2 ? 'P2' : 'P1'
+  ctx.font = '700 9px "Courier New"'; ctx.textAlign='center'
+  ctx.fillStyle = color; ctx.fillText(label, x, y-size-gap-4)
   if (strong) {
-    ctx.globalAlpha=0.30; ctx.fillStyle='#ff8c00'
+    ctx.globalAlpha=0.30; ctx.fillStyle=strongColor
     ctx.beginPath(); ctx.arc(x,y,40,0,Math.PI*2); ctx.fill()
     ctx.globalAlpha=0.15; ctx.beginPath(); ctx.arc(x,y,60,0,Math.PI*2); ctx.fill()
     ctx.globalAlpha=1
   } else if (weak) {
-    ctx.globalAlpha=0.20; ctx.fillStyle='#ffeb3b'
+    ctx.globalAlpha=0.20; ctx.fillStyle=weakColor
     ctx.beginPath(); ctx.arc(x,y,22,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1
   }
 }
@@ -726,6 +739,14 @@ function drawStartScreen() {
   drawText(st,cx-textW(st,ss)/2,cy+70,'#00ff88',ss)
   ctx.globalAlpha=1
 
+  // 2P 감지 표시
+  if (face2Visible) {
+    const p2t='2P DETECTED!', p2s=2
+    ctx.globalAlpha=0.7+0.3*Math.sin(Date.now()/300)
+    drawText(p2t,cx-textW(p2t,p2s)/2,cy+98,'#00e5ff',p2s)
+    ctx.globalAlpha=1
+  }
+
   // Sprites
   drawSprite('slime',   cx-80,cy+100)
   drawSprite('bat',     cx-20,cy+105)
@@ -787,8 +808,9 @@ function draw() {
   }
   if (flashScreen>0) { ctx.fillStyle=`rgba(255,200,100,${flashScreen})`; ctx.fillRect(0,0,canvas.width,canvas.height) }
   for (let y=0;y<canvas.height;y+=4) { ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(0,y,canvas.width,2) }
-  if (crosshair.visible) drawCrosshair()
-  if (!faceVisible&&(state==='playing'||state==='waveclear')) {
+  if (crosshair.visible)  drawCrosshair(crosshair,  blinkPower,  false)
+  if (crosshair2.visible) drawCrosshair(crosshair2, blinkPower2, true)
+  if (!faceVisible && !face2Visible && (state==='playing'||state==='waveclear')) {
     const hint='SHOW YOUR FACE', sz=2
     ctx.globalAlpha=0.4+0.4*Math.sin(Date.now()/500)
     drawText(hint,canvas.width/2-textW(hint,sz)/2,canvas.height-52,'#888',sz)
@@ -908,53 +930,63 @@ const HEAD_SENS_Y  = 2.0
 const faceMesh = new FaceMesh({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
 })
-faceMesh.setOptions({ maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.6, minTrackingConfidence:0.5 })
+faceMesh.setOptions({ maxNumFaces:2, refineLandmarks:true, minDetectionConfidence:0.6, minTrackingConfidence:0.5 })
 
-faceMesh.onResults(results => {
-  if (!results.multiFaceLandmarks?.length) {
-    faceVisible=false; crosshair.visible=false; isBlinking=false; blinkPower=0; return
-  }
-  faceVisible=true
-  const lm=results.multiFaceLandmarks[0]
-
-  // ── 조준: 코끝 고개 방향 + 적응형 스무딩 ──
+function processFace(lm, ch, getBlinkPower, setBlinkPower, getBlinkStart, setBlinkStart, getBlinkType, setBlinkType) {
+  // 조준: 코끝 고개 방향 + 적응형 스무딩
   const rawX=((1-lm[1].x)-0.5)*canvas.width*HEAD_SENS_X + canvas.width/2
   const rawY=(lm[1].y-0.4)*canvas.height*HEAD_SENS_Y + canvas.height/2
-  if (!crosshair.visible) { crosshair.x=rawX; crosshair.y=rawY }
+  if (!ch.visible) { ch.x=rawX; ch.y=rawY }
   else {
-    const dist=Math.hypot(rawX-crosshair.x, rawY-crosshair.y)
+    const dist=Math.hypot(rawX-ch.x, rawY-ch.y)
     const smooth=Math.min(0.85, 0.2+dist/120)
-    crosshair.x=smooth*rawX+(1-smooth)*crosshair.x
-    crosshair.y=smooth*rawY+(1-smooth)*crosshair.y
+    ch.x=smooth*rawX+(1-smooth)*ch.x
+    ch.y=smooth*rawY+(1-smooth)*ch.y
   }
-  crosshair.visible=true
+  ch.visible=true
 
-  // ── 눈 깜빡임 감지 — 한쪽(윙크) vs 양쪽 ──
-  const earL = eyeAR(lm,159,145,33,133)   // 왼쪽 눈
-  const earR = eyeAR(lm,386,374,362,263)  // 오른쪽 눈
-  const leftClosed  = earL < BLINK_THRESH
-  const rightClosed = earR < BLINK_THRESH
-  const bothClosed  = leftClosed && rightClosed
-  const oneClosed   = (leftClosed || rightClosed) && !bothClosed
-  const nowBlink    = leftClosed || rightClosed
+  // 눈 깜빡임 감지
+  const earL=eyeAR(lm,159,145,33,133), earR=eyeAR(lm,386,374,362,263)
+  const leftClosed=earL<BLINK_THRESH, rightClosed=earR<BLINK_THRESH
+  const bothClosed=leftClosed&&rightClosed
+  const oneClosed=(leftClosed||rightClosed)&&!bothClosed
+  const nowBlink=leftClosed||rightClosed
+  const power=bothClosed?2:oneClosed?1:0
+  setBlinkPower(power)
 
-  // 크로스헤어 표시용 파워 상태 업데이트
-  blinkPower = bothClosed ? 2 : oneClosed ? 1 : 0
-  isBlinking = nowBlink
-
-  if (nowBlink && blinkStart===0) {
-    blinkStart = Date.now()
-    blinkType  = bothClosed ? 2 : 1   // 감기 시작할 때 타입 결정
+  const bs=getBlinkStart()
+  if (nowBlink && bs===0) { setBlinkStart(Date.now()); setBlinkType(bothClosed?2:1) }
+  if (!nowBlink && bs>0) {
+    const dur=Date.now()-bs; setBlinkStart(0)
+    if (dur>60&&dur<450&&gameStartCooldown<=0&&state==='playing') tryShoot(ch.x,ch.y,getBlinkType())
+    else if (dur>=800 && (state==='start'||state==='gameover') && scoreOverlay.classList.contains('hidden')) startGame()
+    setBlinkType(0)
   }
-  // 눈이 떠지면 → 발사 또는 게임 시작
-  if (!nowBlink && blinkStart>0) {
-    const dur=Date.now()-blinkStart; blinkStart=0
-    if (dur>60 && dur<450 && gameStartCooldown<=0 && state==='playing') {
-      tryShoot(crosshair.x, crosshair.y, blinkType)
-    } else if (dur>=800) {
-      if ((state==='start' || state==='gameover') && scoreOverlay.classList.contains('hidden')) startGame()
-    }
-    blinkType=0
+}
+
+faceMesh.onResults(results => {
+  const faces = results.multiFaceLandmarks || []
+
+  // P1
+  if (faces.length >= 1) {
+    faceVisible = true
+    processFace(faces[0], crosshair,
+      ()=>blinkPower,  v=>{ blinkPower=v },
+      ()=>blinkStart,  v=>{ blinkStart=v },
+      ()=>blinkType,   v=>{ blinkType=v })
+  } else {
+    faceVisible=false; crosshair.visible=false; blinkPower=0
+  }
+
+  // P2
+  if (faces.length >= 2) {
+    face2Visible = true
+    processFace(faces[1], crosshair2,
+      ()=>blinkPower2, v=>{ blinkPower2=v },
+      ()=>blinkStart2, v=>{ blinkStart2=v },
+      ()=>blinkType2,  v=>{ blinkType2=v })
+  } else {
+    face2Visible=false; crosshair2.visible=false; blinkPower2=0
   }
 })
 
