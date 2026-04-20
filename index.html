@@ -208,7 +208,7 @@
         WAVE &nbsp;&nbsp;<span id="finalWave">1</span>
       </div>
       <div id="lbPreview">
-        <div class="lb-title">-- TOP 5 --</div>
+        <div class="lb-title">-- TOP 20 --</div>
         <div class="lb-rows" id="lbRows">로딩 중...</div>
       </div>
       <!-- 닉네임 입력 (등록 전) -->
@@ -1108,7 +1108,7 @@ const quitBtn      = document.getElementById('quitBtn')
 function renderLbPreview() {
   const rows = document.getElementById('lbRows')
   if (!leaderboard.length) { rows.textContent = '아직 기록이 없어요'; return }
-  rows.innerHTML = leaderboard.slice(0, 5).map((e, i) => {
+  rows.innerHTML = leaderboard.slice(0, 20).map((e, i) => {
     const rank = `${i+1}.`.padEnd(3, '\u00A0')
     const nick = e.nick.slice(0, 8).padEnd(8, '\u00A0')
     const sc   = String(e.score).padStart(6, '\u00A0')
