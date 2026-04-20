@@ -981,16 +981,16 @@ function drawLeaderboard(cx, startY, highlightNick, maxRows=20) {
 
     ctx.fillStyle = color
     ctx.textAlign = 'right'
-    ctx.fillText(`${i+1}.`, colCx-34, y)
+    ctx.fillText(`${i+1}.`, colCx-50, y)
     ctx.textAlign = 'left'
     // 실제 픽셀 폭 기준으로 닉네임 잘라내기 (한글 대응)
-    const maxNickW = 68
+    const maxNickW = 44
     let dn = entry.nick
     while (dn.length > 1 && ctx.measureText(dn + '…').width > maxNickW) dn = dn.slice(0,-1)
     if (dn.length < entry.nick.length) dn += '…'
-    ctx.fillText(dn, colCx-26, y)
+    ctx.fillText(dn, colCx-42, y)
     ctx.textAlign = 'right'
-    ctx.fillText(entry.score.toLocaleString(), colCx+60, y)
+    ctx.fillText(entry.score.toLocaleString(), colCx+76, y)
   })
   ctx.textAlign = 'left'
 }
