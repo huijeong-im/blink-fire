@@ -143,9 +143,9 @@
     .px-btn-ghost:hover { color: #fff; border-color: #888; }
 
     /* 섹션 show/hide */
-    #retrySection { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
-    #retrySection.hidden { display: none; }
-    #nickSection.hidden  { display: none; }
+    #nickForm { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+    #nickForm.hidden { display: none; }
+    #doneMsg.hidden  { display: none; }
 
     .retry-msg   { font-family: var(--ko); font-size: 12px; color: var(--green); text-align: center; }
     .retry-score { font-family: var(--px); font-size: 8px; color: #888; text-align: center; line-height: 2.5; }
@@ -201,41 +201,30 @@
 
 <div id="scoreOverlay" class="hidden">
   <div class="score-box">
-
-    <!-- 닉네임 입력 섹션 -->
-    <div id="nickSection">
-      <div class="px-titlebar">* GAME OVER *</div>
-      <div class="px-body">
-        <div class="go-nums">
-          SCORE &nbsp;<span id="finalScore">0</span><br>
-          WAVE &nbsp;&nbsp;<span id="finalWave">1</span>
-        </div>
-        <div id="lbPreview">
-          <div class="lb-title">-- TOP 5 --</div>
-          <div class="lb-rows" id="lbRows">로딩 중...</div>
-        </div>
+    <div class="px-titlebar">* GAME OVER *</div>
+    <div class="px-body">
+      <div class="go-nums">
+        SCORE &nbsp;<span id="finalScore">0</span><br>
+        WAVE &nbsp;&nbsp;<span id="finalWave">1</span>
+      </div>
+      <div id="lbPreview">
+        <div class="lb-title">-- TOP 5 --</div>
+        <div class="lb-rows" id="lbRows">로딩 중...</div>
+      </div>
+      <!-- 닉네임 입력 (등록 전) -->
+      <div id="nickForm">
         <div class="go-desc">닉네임을 입력하면 랭킹에 등록돼요<br>등록 안 해도 계속 플레이할 수 있어요</div>
         <input id="nickInput" type="text" placeholder="닉네임 입력 (최대 10자)"
                maxlength="10" autocomplete="off" autocorrect="off" spellcheck="false">
         <button id="submitBtn" class="px-btn">SUBMIT SCORE</button>
         <button id="skipBtn" class="px-btn-ghost">건너뛰기 (등록 안 함)</button>
       </div>
+      <!-- 등록 완료 메시지 (등록 후) -->
+      <div id="doneMsg" class="hidden retry-msg"></div>
+      <!-- 항상 표시 -->
+      <button id="retryBtn" class="px-btn">PLAY AGAIN</button>
+      <button id="quitBtn" class="px-btn-ghost">그만하기</button>
     </div>
-
-    <!-- 재도전 확인 섹션 -->
-    <div id="retrySection" class="hidden">
-      <div class="px-titlebar">* GAME OVER *</div>
-      <div class="px-body">
-        <div class="retry-score">
-          SCORE &nbsp;<span id="retryScore">0</span><br>
-          WAVE &nbsp;&nbsp;<span id="retryWave">1</span>
-        </div>
-        <div class="retry-msg" id="retryMsg">등록이 완료됐어요!</div>
-        <button id="retryBtn" class="px-btn">PLAY AGAIN</button>
-        <button id="quitBtn" class="px-btn-ghost">그만하기</button>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -596,7 +585,7 @@ function spawnParticles(x, y, color, count=14) {
 // ─── SHOOT ───────────────────────────────────────────────────────────────────
 // power: 1=약한샷(윙크), 2=강한샷(양쪽눈)
 function tryShoot(x, y, power = 1) {
-  if (!canShoot || state !== 'playing') return
+  if (!canShoot || state !== 'playing' || paused) return
   canShoot = false
 
   const isStrong   = power >= 2
@@ -1106,24 +1095,24 @@ function loop(ts) {
 }
 requestAnimationFrame(loop)
 
-// ─── SCORE OVERLAY (게임오버 후 닉네임 입력 + 랭킹 등록) ─────────────────────
-const scoreOverlay  = document.getElementById('scoreOverlay')
-const nickSection   = document.getElementById('nickSection')
-const retrySection  = document.getElementById('retrySection')
-const nickInput     = document.getElementById('nickInput')
-const submitBtn     = document.getElementById('submitBtn')
-const skipBtn       = document.getElementById('skipBtn')
-const retryBtn      = document.getElementById('retryBtn')
-const quitBtn       = document.getElementById('quitBtn')
+// ─── SCORE OVERLAY (게임오버 — 단일 화면) ────────────────────────────────────
+const scoreOverlay = document.getElementById('scoreOverlay')
+const nickInput    = document.getElementById('nickInput')
+const nickForm     = document.getElementById('nickForm')
+const submitBtn    = document.getElementById('submitBtn')
+const skipBtn      = document.getElementById('skipBtn')
+const doneMsg      = document.getElementById('doneMsg')
+const retryBtn     = document.getElementById('retryBtn')
+const quitBtn      = document.getElementById('quitBtn')
 
 function renderLbPreview() {
   const rows = document.getElementById('lbRows')
   if (!leaderboard.length) { rows.textContent = '아직 기록이 없어요'; return }
   rows.innerHTML = leaderboard.slice(0, 5).map((e, i) => {
-    const rank  = `${i+1}.`.padEnd(3, '\u00A0')
-    const nick  = e.nick.slice(0, 8).padEnd(8, '\u00A0')
-    const sc    = String(e.score).padStart(6, '\u00A0')
-    const isMe  = playerNick && e.nick.toUpperCase() === playerNick.toUpperCase()
+    const rank = `${i+1}.`.padEnd(3, '\u00A0')
+    const nick = e.nick.slice(0, 8).padEnd(8, '\u00A0')
+    const sc   = String(e.score).padStart(6, '\u00A0')
+    const isMe = playerNick && e.nick.toUpperCase() === playerNick.toUpperCase()
     return `<div class="${isMe ? 'lb-me' : ''}">${rank}${nick} ${sc}</div>`
   }).join('')
 }
@@ -1131,24 +1120,25 @@ function renderLbPreview() {
 function showScoreOverlay() {
   document.getElementById('finalScore').textContent = score
   document.getElementById('finalWave').textContent  = wave
-  nickSection.classList.remove('hidden')
-  retrySection.classList.add('hidden')
+  nickForm.classList.remove('hidden')
+  doneMsg.classList.add('hidden')
   nickInput.value = ''
+  submitBtn.textContent = 'SUBMIT SCORE'
+  submitBtn.disabled = false
   renderLbPreview()
   scoreOverlay.classList.remove('hidden')
   setTimeout(() => nickInput.focus(), 100)
 }
 
-function showRetrySection(msg) {
-  document.getElementById('retryScore').textContent = score
-  document.getElementById('retryWave').textContent  = wave
-  document.getElementById('retryMsg').textContent   = msg
-  nickSection.classList.add('hidden')
-  retrySection.classList.remove('hidden')
-}
-
 function hideScoreOverlay() {
   scoreOverlay.classList.add('hidden')
+}
+
+function showDone(msg) {
+  nickForm.classList.add('hidden')
+  doneMsg.textContent = msg
+  doneMsg.classList.remove('hidden')
+  renderLbPreview()
 }
 
 async function doSubmit() {
@@ -1160,17 +1150,12 @@ async function doSubmit() {
   await submitScore(playerNick, score)
   leaderboard = await fetchLeaderboard()
   scoreSubmitted = true
-  submitBtn.textContent = '🏆 랭킹 등록'
-  submitBtn.disabled = false
-  showRetrySection('등록이 완료됐어요!')
+  showDone('🏆 랭킹 등록 완료!')
 }
 
 submitBtn.addEventListener('click', doSubmit)
 nickInput.addEventListener('keydown', e => { if (e.key==='Enter') doSubmit() })
-skipBtn.addEventListener('click', () => {
-  playerNick = ''
-  showRetrySection('랭킹 등록을 건너뛰었어요')
-})
+skipBtn.addEventListener('click', () => { playerNick = ''; showDone('건너뛰었어요. 다시 도전해보세요!') })
 retryBtn.addEventListener('click', () => { hideScoreOverlay(); startGame() })
 quitBtn.addEventListener('click',  () => { hideScoreOverlay() })
 
