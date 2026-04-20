@@ -564,6 +564,7 @@ let waveSize      = 6
 let spawnGap      = 1.8
 let gameStartCooldown = 0
 let gameOverCooldown  = 0   // 게임오버 직후 깜빡임 차단
+let paused            = false
 
 const ETYPES = ['slime','bat','skeleton']
 const EHP    = { slime:1, bat:1, skeleton:3 }
@@ -648,6 +649,17 @@ function tryShoot(x, y, power = 1) {
   setTimeout(() => { canShoot=true }, rapidTimer>0 ? 80 : isStrong ? 400 : 250)
 }
 
+// ─── PAUSE ───────────────────────────────────────────────────────────────────
+function togglePause() {
+  if (state !== 'playing' && state !== 'waveclear') return
+  paused = !paused
+  if (paused) _ac.suspend()
+  else        _ac.resume()
+}
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); togglePause() }
+})
+
 // ─── ITEM LOGIC ──────────────────────────────────────────────────────────────
 const ITEM_TYPES = ['heart','rapid','bomb','slow','double']
 const ITEM_DROP_CHANCE = 0.28
@@ -727,6 +739,7 @@ function loseLife() {
 
 // ─── UPDATE ──────────────────────────────────────────────────────────────────
 function update(dt) {
+  if (paused) return
   frameTime += dt
   gameStartCooldown = Math.max(0, gameStartCooldown-dt)
   gameOverCooldown  = Math.max(0, gameOverCooldown-dt)
@@ -870,7 +883,7 @@ function drawHUD() {
     ctx.font = '700 10px "Courier New"'; ctx.textAlign = 'left'
     ctx.fillStyle = ef.color
     ctx.globalAlpha = 0.8 + 0.2*Math.sin(Date.now()/200)
-    ctx.fillText(ef.label, pad, canvas.height - pad - i*20)
+    ctx.fillText(ef.label, pad, canvas.height - 56 - i*20)
     ctx.globalAlpha = 1
   })
   // 콤보 표시
@@ -1064,6 +1077,17 @@ function draw() {
   if (itemFlash.alpha>0) { ctx.fillStyle=`rgba(${hexToRgb(itemFlash.color)},${itemFlash.alpha.toFixed(2)})`; ctx.fillRect(0,0,canvas.width,canvas.height) }
   if (flashScreen>0) { ctx.fillStyle=`rgba(255,200,100,${flashScreen})`; ctx.fillRect(0,0,canvas.width,canvas.height) }
   for (let y=0;y<canvas.height;y+=4) { ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(0,y,canvas.width,2) }
+  if (paused) {
+    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,canvas.width,canvas.height)
+    const cx=canvas.width/2, cy=canvas.height/2
+    const pt='PAUSED', ps=6
+    drawText(pt, cx-textW(pt,ps)/2+3, cy-40+3, '#000', ps)
+    drawText(pt, cx-textW(pt,ps)/2,   cy-40,   '#ffeb3b', ps)
+    const hint='SPACE OR LONG BLINK TO RESUME', hs=2
+    ctx.globalAlpha=0.6+0.4*Math.sin(Date.now()/500)
+    drawText(hint, cx-textW(hint,hs)/2, cy+20, '#aaa', hs)
+    ctx.globalAlpha=1
+  }
   if (crosshair.visible)  drawCrosshair(crosshair,  blinkPower,  false)
   if (crosshair2.visible) drawCrosshair(crosshair2, blinkPower2, true)
   if (!faceVisible && !face2Visible && (state==='playing'||state==='waveclear')) {
@@ -1215,7 +1239,10 @@ function processFace(lm, ch, getBlinkPower, setBlinkPower, getBlinkStart, setBli
   if (!nowBlink && bs>0) {
     const dur=Date.now()-bs; setBlinkStart(0)
     if (dur>60&&dur<450&&gameStartCooldown<=0&&state==='playing') tryShoot(ch.x,ch.y,getBlinkType())
-    else if (dur>=800 && gameOverCooldown<=0 && (state==='start'||state==='gameover') && scoreOverlay.classList.contains('hidden')) startGame()
+    else if (dur>=800 && gameOverCooldown<=0) {
+      if (state==='playing' || state==='waveclear') togglePause()
+      else if ((state==='start'||state==='gameover') && scoreOverlay.classList.contains('hidden')) startGame()
+    }
     setBlinkType(0)
   }
 }
