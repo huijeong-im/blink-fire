@@ -8,7 +8,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #000; overflow: hidden; touch-action: none; }
     #gameCanvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
-    #video { display: none; }
+    #video { position: absolute; visibility: hidden; width: 0; height: 0; }
     #camCanvas {
       position: fixed; bottom: 12px; right: 12px;
       width: min(160px, 22vw); height: min(120px, 16.5vw);
@@ -27,33 +27,66 @@
     #loading .title { font-size: clamp(18px,4vw,28px); letter-spacing: 4px; color: #ffeb3b; }
     #loading .sub   { font-size: 13px; color: #555; }
     #loading .hint  { font-size: 13px; color: #888; animation: blink 1s infinite; }
-    /* ── 닉네임 입력 ── */
-    #nickOverlay {
-      position: fixed; inset: 0; background: rgba(6,6,15,0.97);
+    /* ── 점수 제출 오버레이 ── */
+    #scoreOverlay {
+      position: fixed; inset: 0; background: rgba(6,6,15,0.88);
       display: flex; align-items: center; justify-content: center; z-index: 20;
     }
-    #nickOverlay.hidden { display: none; }
-    .nick-box {
+    #scoreOverlay.hidden { display: none; }
+    .score-box {
       display: flex; flex-direction: column; align-items: center;
-      gap: 20px; padding: 40px 24px; width: min(380px,90vw);
+      gap: 14px; padding: 32px 28px; width: min(360px,90vw);
+      background: #0d0d20; border: 2px solid #222; border-radius: 12px;
     }
-    .nick-logo  { font-size: clamp(28px,6vw,48px); color: #ffeb3b;
-                  font-family: monospace; letter-spacing: 4px; }
-    .nick-flame { font-size: clamp(36px,7vw,56px); }
-    .nick-desc  { font-family: monospace; font-size: 12px; color: #555; text-align: center; line-height: 1.8; }
+    .score-box .go-title { font-family: monospace; font-size: clamp(22px,5vw,32px);
+                           color: #f44336; letter-spacing: 4px; }
+    .score-box .go-nums  { font-family: monospace; font-size: 14px; color: #aaa; text-align: center; line-height: 2; }
+    .score-box .go-desc  { font-family: monospace; font-size: 12px; color: #555;
+                           text-align: center; line-height: 1.8; margin-top: 4px; }
     #nickInput {
       background: #111; border: 2px solid #333; border-radius: 8px;
-      color: #fff; font-family: monospace; font-size: clamp(18px,4vw,22px);
-      padding: 14px 20px; text-align: center; width: 100%; outline: none;
+      color: #fff; font-family: monospace; font-size: clamp(16px,4vw,20px);
+      padding: 12px 16px; text-align: center; width: 100%; outline: none;
     }
     #nickInput:focus { border-color: #ffeb3b; }
-    #nickInput::placeholder { color: #444; }
-    #nickBtn {
+    #nickInput::placeholder { color: #333; }
+    #submitBtn {
       background: #ffeb3b; border: none; border-radius: 8px; color: #000;
-      cursor: pointer; font-family: monospace; font-size: clamp(16px,3.5vw,20px);
-      font-weight: bold; padding: 14px; width: 100%; letter-spacing: 2px;
+      cursor: pointer; font-family: monospace; font-size: clamp(14px,3.5vw,18px);
+      font-weight: bold; padding: 12px; width: 100%; letter-spacing: 2px;
     }
-    #nickBtn:active { background: #ffd600; }
+    #submitBtn:active { background: #ffd600; }
+    #skipBtn {
+      background: none; border: none; color: #444; cursor: pointer;
+      font-family: monospace; font-size: 12px; padding: 4px;
+      text-decoration: underline;
+    }
+    #skipBtn:hover { color: #888; }
+    /* ── 재도전 섹션 ── */
+    #retrySection { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; }
+    #retrySection.hidden { display: none; }
+    #nickSection.hidden  { display: none; }
+    .retry-msg  { font-family: monospace; font-size: 13px; color: #00ff88; text-align: center; }
+    .retry-score { font-family: monospace; font-size: 14px; color: #aaa; text-align: center; line-height: 2; }
+    #retryBtn {
+      background: #ffeb3b; border: none; border-radius: 8px; color: #000;
+      cursor: pointer; font-family: monospace; font-size: clamp(14px,3.5vw,18px);
+      font-weight: bold; padding: 12px; width: 100%; letter-spacing: 2px;
+    }
+    #retryBtn:active { background: #ffd600; }
+    #quitBtn {
+      background: none; border: none; color: #444; cursor: pointer;
+      font-family: monospace; font-size: 12px; padding: 4px; text-decoration: underline;
+    }
+    #quitBtn:hover { color: #888; }
+    /* ── 랭킹 미리보기 ── */
+    #lbPreview {
+      width: 100%; background: #0a0a18; border-radius: 6px;
+      padding: 10px 14px; font-family: monospace; font-size: 12px;
+      line-height: 1.9; color: #666;
+    }
+    #lbPreview .lb-title { color: #ffeb3b; margin-bottom: 4px; }
+    #lbPreview .lb-me    { color: #00ff88; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
   </style>
 </head>
@@ -66,18 +99,33 @@
   <div class="hint">얼굴을 카메라에 보여주세요</div>
 </div>
 
-<div id="nickOverlay" class="hidden">
-  <div class="nick-box">
-    <div class="nick-flame">🔥</div>
-    <div class="nick-logo">BLINK FIRE</div>
-    <div class="nick-desc">
-      고개를 움직여 조준<br>
-      눈 깜빡이면 발사<br>
-      눈 오래 감으면 시작/재시작
+<div id="scoreOverlay" class="hidden">
+  <div class="score-box">
+
+    <!-- 닉네임 입력 섹션 -->
+    <div id="nickSection">
+      <div class="go-title">GAME OVER</div>
+      <div class="go-nums">
+        SCORE : <span id="finalScore">0</span><br>
+        WAVE &nbsp;: <span id="finalWave">1</span>
+      </div>
+      <div id="lbPreview"><div class="lb-title"># TOP 5</div><div id="lbRows">로딩 중...</div></div>
+      <div class="go-desc">닉네임을 입력하면 랭킹에 등록돼요</div>
+      <input id="nickInput" type="text" placeholder="닉네임 입력 (최대 10자)"
+             maxlength="10" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button id="submitBtn">🏆 랭킹 등록</button>
+      <button id="skipBtn">건너뛰기 (등록 안 함)</button>
     </div>
-    <input id="nickInput" type="text" placeholder="닉네임 입력 (최대 10자)"
-           maxlength="10" autocomplete="off" autocorrect="off" spellcheck="false">
-    <button id="nickBtn">🔥 START</button>
+
+    <!-- 재도전 확인 섹션 -->
+    <div id="retrySection" class="hidden">
+      <div class="go-title">GAME OVER</div>
+      <div class="retry-score">SCORE : <span id="retryScore">0</span> &nbsp; WAVE : <span id="retryWave">1</span></div>
+      <div class="retry-msg" id="retryMsg">등록이 완료됐어요!</div>
+      <button id="retryBtn">🔥 다시 시작 (WAVE 1)</button>
+      <button id="quitBtn">그만하기</button>
+    </div>
+
   </div>
 </div>
 
@@ -86,6 +134,7 @@
 <canvas id="camCanvas" width="200" height="150"></canvas>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 
 <script>
 // ─── UPSTASH CONFIG ──────────────────────────────────────────────────────────
@@ -127,9 +176,6 @@ const video   = document.getElementById('video')
 const camCv   = document.getElementById('camCanvas')
 const camCtx  = camCv.getContext('2d')
 const loading = document.getElementById('loading')
-const nickOverlay = document.getElementById('nickOverlay')
-const nickInput   = document.getElementById('nickInput')
-const nickBtn     = document.getElementById('nickBtn')
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
 resize()
@@ -222,8 +268,8 @@ function drawStars() {
 }
 
 // ─── GAME STATE ──────────────────────────────────────────────────────────────
-let playerNick    = localStorage.getItem('blinkfire-nick') || ''
-let leaderboard   = []   // [{ nick, score }, ...]
+let playerNick    = ''   // 게임오버 후 입력, 매 게임마다 초기화
+let leaderboard   = []
 let lbLoaded      = false
 let scoreSubmitted = false
 
@@ -242,9 +288,14 @@ let shakeAmount   = 0, shakeX = 0, shakeY = 0
 let crosshair     = { x:-200, y:-200, visible:false }
 let faceVisible   = false
 let isBlinking    = false
+let blinkPower    = 0    // 0=none 1=weak(윙크) 2=strong(양쪽)
 let blinkStart    = 0
+let blinkType     = 0    // 발사 타입 기록용
 let canShoot      = true
 let flashScreen   = 0
+let comboCount    = 0
+let comboTimer    = 0
+const COMBO_WINDOW = 2.2
 let waveDelay     = 0
 let spawnTimer    = 0
 let spawned       = 0
@@ -280,40 +331,57 @@ function spawnParticles(x, y, color, count=14) {
 }
 
 // ─── SHOOT ───────────────────────────────────────────────────────────────────
-function tryShoot(x, y) {
+// power: 1=약한샷(윙크), 2=강한샷(양쪽눈)
+function tryShoot(x, y, power = 1) {
   if (!canShoot || state !== 'playing') return
   canShoot = false
-  muzzleFlashes.push({x, y, life:1, size:70})
-  flashScreen = 0.35
+
+  const isStrong   = power >= 2
+  const damage     = isStrong ? 2 : 1
+  const flashSize  = isStrong ? 100 : 48
+  const flashColor = isStrong ? '#ff8c00' : '#ffe57f'
+  flashScreen      = isStrong ? 0.55 : 0.22
+
+  muzzleFlashes.push({x, y, life:1, size:flashSize, strong:isStrong})
+  if (isStrong) {
+    muzzleFlashes.push({x, y, life:0.7, size:flashSize*1.4, strong:true})
+  }
+
   let hit=false, hitX=0, hitY=y
   for (let i=enemies.length-1; i>=0; i--) {
     const e=enemies[i], sw=SP[e.type].w*SC, sh=SP[e.type].h*SC
     const ex=e.x-sw/2, ey=e.y-sh/2
     if (x>=ex-8 && x<=ex+sw+8 && y>=ey-8 && y<=ey+sh+8) {
-      e.hp--; e.hitFlash=0.4; hitX=e.x; hitY=e.y
+      e.hp -= damage; e.hitFlash=0.4; hitX=e.x; hitY=e.y
       if (e.hp<=0) {
-        const pts=ESCORE[e.type]*wave; score+=pts
-        spawnParticles(e.x, e.y, ECOLOR[e.type], 22)
-        shockwaves.push({x:e.x,y:e.y,r:0,life:1,color:ECOLOR[e.type]})
-        shockwaves.push({x:e.x,y:e.y,r:0,life:0.7,color:'#fff'})
-        scorePopups.push({x:e.x,y:e.y-10,text:`+${pts}`,life:1})
-        enemies.splice(i,1); shakeAmount=9
-      } else { shakeAmount=5 }
+        const combo = comboCount >= 2 ? comboCount : 1
+        const pts   = ESCORE[e.type] * wave * combo
+        score += pts
+        comboCount++; comboTimer = COMBO_WINDOW
+        spawnParticles(e.x, e.y, ECOLOR[e.type], isStrong ? 32 : 18)
+        shockwaves.push({x:e.x,y:e.y,r:0,life:1,     color:ECOLOR[e.type]})
+        shockwaves.push({x:e.x,y:e.y,r:0,life:0.7,   color:'#fff'})
+        if (isStrong) shockwaves.push({x:e.x,y:e.y,r:0,life:0.5,color:flashColor})
+        const label = combo>=2 ? `+${pts} x${combo}!` : `+${pts}`
+        scorePopups.push({x:e.x,y:e.y-10,text:label,life:1,combo:combo>=2})
+        enemies.splice(i,1); shakeAmount = isStrong ? 14 : 7
+      } else { shakeAmount = isStrong ? 7 : 4 }
       hit=true; break
     }
   }
-  bulletTrails.push({x1:x,y1:y,x2:hit?hitX:0,y2:hitY,life:1})
-  if (!hit) shakeAmount=2
-  setTimeout(() => { canShoot=true }, 300)
+  bulletTrails.push({x1:x,y1:y,x2:hit?hitX:0,y2:hitY,life:1,strong:isStrong})
+  if (!hit) { shakeAmount=isStrong?4:2 }
+  setTimeout(() => { canShoot=true }, isStrong ? 400 : 250)
 }
 
 // ─── GAME LOGIC ──────────────────────────────────────────────────────────────
 function startGame() {
-  if (!playerNick) { showNickOverlay(); return }
+  playerNick=''   // 매 게임마다 닉네임 초기화
   score=0; lives=3; wave=1
   enemies=[]; particles=[]; flashes=[]; scorePopups=[]
   muzzleFlashes=[]; bulletTrails=[]; shockwaves=[]
   spawned=0; spawnTimer=0; waveDelay=0
+  comboCount=0; comboTimer=0
   waveConfig(wave); gameStartCooldown=1.5
   scoreSubmitted=false; state='playing'
 }
@@ -324,10 +392,8 @@ function loseLife() {
   lives--; flashScreen=0.5
   if (lives<=0) {
     state='gameover'
-    if (!scoreSubmitted && playerNick && score>0) {
-      scoreSubmitted=true
-      submitScore(playerNick, score).then(() => fetchLeaderboard().then(lb => { leaderboard=lb }))
-    }
+    // 랭킹 갱신 후 점수 제출 오버레이 표시
+    fetchLeaderboard().then(lb => { leaderboard=lb; showScoreOverlay() })
   }
 }
 
@@ -360,6 +426,7 @@ function update(dt) {
   }
   flashScreen=Math.max(0,flashScreen-dt*4)
   shakeAmount=Math.max(0,shakeAmount-dt*40)
+  if (comboCount>0) { comboTimer-=dt; if(comboTimer<=0) comboCount=0 }
   shakeX = shakeAmount>0.5?(Math.random()-0.5)*shakeAmount:0
   shakeY = shakeAmount>0.5?(Math.random()-0.5)*shakeAmount:0
   for (let i=muzzleFlashes.length-1;i>=0;i--) { muzzleFlashes[i].life-=dt*5; if(muzzleFlashes[i].life<=0) muzzleFlashes.splice(i,1) }
@@ -394,7 +461,10 @@ function drawFlashes() {
   ctx.globalAlpha=1
 }
 function drawScorePopups() {
-  for (const p of scorePopups) { ctx.globalAlpha=Math.max(0,p.life); drawText(p.text,Math.floor(p.x),Math.floor(p.y),'#ffeb3b',3) }
+  for (const p of scorePopups) {
+    ctx.globalAlpha=Math.max(0,p.life)
+    drawText(p.text,Math.floor(p.x),Math.floor(p.y),p.combo?'#ff9800':'#ffeb3b',p.combo?4:3)
+  }
   ctx.globalAlpha=1
 }
 function drawMuzzleFlashes() {
@@ -415,10 +485,17 @@ function drawMuzzleFlashes() {
 function drawBulletTrails() {
   for (const t of bulletTrails) {
     const a=Math.max(0,t.life)
-    ctx.globalAlpha=a*0.5; ctx.strokeStyle='#fff'; ctx.lineWidth=5*a; ctx.lineCap='round'
-    ctx.beginPath(); ctx.moveTo(t.x1,t.y1); ctx.lineTo(t.x2,t.y2); ctx.stroke()
-    ctx.globalAlpha=a; ctx.strokeStyle='#ffe57f'; ctx.lineWidth=2*a
-    ctx.beginPath(); ctx.moveTo(t.x1,t.y1); ctx.lineTo(t.x2,t.y2); ctx.stroke()
+    if (t.strong) {
+      ctx.globalAlpha=a*0.6; ctx.strokeStyle='#ff8c00'; ctx.lineWidth=9*a; ctx.lineCap='round'
+      ctx.beginPath(); ctx.moveTo(t.x1,t.y1); ctx.lineTo(t.x2,t.y2); ctx.stroke()
+      ctx.globalAlpha=a; ctx.strokeStyle='#fff'; ctx.lineWidth=3*a
+      ctx.beginPath(); ctx.moveTo(t.x1,t.y1); ctx.lineTo(t.x2,t.y2); ctx.stroke()
+    } else {
+      ctx.globalAlpha=a*0.4; ctx.strokeStyle='#fff'; ctx.lineWidth=4*a; ctx.lineCap='round'
+      ctx.beginPath(); ctx.moveTo(t.x1,t.y1); ctx.lineTo(t.x2,t.y2); ctx.stroke()
+      ctx.globalAlpha=a*0.8; ctx.strokeStyle='#ffe57f'; ctx.lineWidth=1.5*a
+      ctx.beginPath(); ctx.moveTo(t.x1,t.y1); ctx.lineTo(t.x2,t.y2); ctx.stroke()
+    }
   }
   ctx.globalAlpha=1; ctx.lineCap='butt'
 }
@@ -434,25 +511,43 @@ function drawHUD() {
   drawText(`SCORE:${score}`, pad, pad, '#fff', sz)
   const wt=`WAVE ${wave}`
   drawText(wt, canvas.width/2-textW(wt,sz)/2, pad, '#ffeb3b', sz)
-  if (playerNick) {
-    const nt = playerNick.toUpperCase()
-    drawText(nt, canvas.width/2-textW(nt,2)/2, pad+sz*7, '#888', 2)
-  }
   for (let i=0;i<3;i++) {
     const hx=canvas.width-pad-(3-i)*(SP.heart.w*SC+6)
     drawSprite('heart',hx,pad,0,i<lives?null:'#1a1a2e')
   }
+  // 콤보 표시
+  if (comboCount>=2) {
+    const ct=`x${comboCount} COMBO!`, cs=3
+    const pulse=0.7+0.3*Math.sin(Date.now()/120)
+    ctx.globalAlpha=pulse
+    drawText(ct, canvas.width/2-textW(ct,cs)/2, canvas.height-52, '#ffeb3b', cs)
+    ctx.globalAlpha=1
+    // 콤보 타이머 바
+    const bw=120, bh=4
+    const bx=canvas.width/2-bw/2, by=canvas.height-28
+    ctx.fillStyle='#222'; ctx.fillRect(bx,by,bw,bh)
+    const ratio=comboTimer/COMBO_WINDOW
+    const barColor=ratio>0.5?'#ffeb3b':ratio>0.25?'#ff9800':'#f44336'
+    ctx.fillStyle=barColor; ctx.fillRect(bx,by,Math.floor(bw*ratio),bh)
+  }
 }
 function drawCrosshair() {
   const {x,y}=crosshair, size=18, gap=5
-  const color=(isBlinking&&gameStartCooldown<=0)?'#ff4444':'#00ff88'
+  const strong = blinkPower>=2 && gameStartCooldown<=0
+  const weak   = blinkPower===1 && gameStartCooldown<=0
+  const color  = strong ? '#ff8c00' : weak ? '#ffeb3b' : '#00ff88'
   ctx.fillStyle=color
   ctx.fillRect(x-size-gap,y-1,size,2); ctx.fillRect(x+gap+1,y-1,size,2)
   ctx.fillRect(x-1,y-size-gap,2,size); ctx.fillRect(x-1,y+gap+1,2,size)
   ctx.fillRect(x-2,y-2,4,4)
-  if (isBlinking&&gameStartCooldown<=0) {
-    ctx.globalAlpha=0.25; ctx.fillStyle='#ff4444'
-    ctx.beginPath(); ctx.arc(x,y,28,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1
+  if (strong) {
+    ctx.globalAlpha=0.30; ctx.fillStyle='#ff8c00'
+    ctx.beginPath(); ctx.arc(x,y,40,0,Math.PI*2); ctx.fill()
+    ctx.globalAlpha=0.15; ctx.beginPath(); ctx.arc(x,y,60,0,Math.PI*2); ctx.fill()
+    ctx.globalAlpha=1
+  } else if (weak) {
+    ctx.globalAlpha=0.20; ctx.fillStyle='#ffeb3b'
+    ctx.beginPath(); ctx.arc(x,y,22,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1
   }
 }
 function drawWaveBanner() {
@@ -540,27 +635,26 @@ function drawGameOver() {
   drawText(wt, cx-textW(wt,ss)/2, cy,    '#ffeb3b', ss)
 
   // Rank highlight
-  const rank=leaderboard.findIndex(e=>e.nick.toUpperCase()===playerNick.toUpperCase())
-  if (rank>=0) {
-    const rt=`YOUR RANK : #${rank+1}`, rs=2
-    drawText(rt, cx-textW(rt,rs)/2, cy+24, '#00ff88', rs)
+  if (playerNick) {
+    const rank=leaderboard.findIndex(e=>e.nick.toUpperCase()===playerNick.toUpperCase())
+    if (rank>=0) {
+      const rt=`YOUR RANK : #${rank+1}`, rs=2
+      drawText(rt, cx-textW(rt,rs)/2, cy+24, '#00ff88', rs)
+    }
   }
 
   // Leaderboard
   drawLeaderboard(cx, cy+42, playerNick)
 
-  // Retry
-  const rtt='BLINK LONG TO RETRY', rs2=2
+  // Retry — 오버레이가 닫힌 후에만 표시
   const lbBot=cy+42+16+Math.min(8,leaderboard.length)*14+10
-  ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
-  drawText(rtt, cx-textW(rtt,rs2)/2, lbBot+8, '#00ff88', rs2)
-  ctx.globalAlpha=1
+  if (document.getElementById('scoreOverlay').classList.contains('hidden')) {
+    const rtt='BLINK LONG TO RETRY', rs2=2
+    ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
+    drawText(rtt, cx-textW(rtt,rs2)/2, lbBot+8, '#00ff88', rs2)
+    ctx.globalAlpha=1
+  }
 
-  // Change nick
-  const cn='TAP HERE TO CHANGE NICKNAME', cs=1
-  ctx.globalAlpha=0.3
-  drawText(cn, cx-textW(cn,cs)/2, lbBot+24, '#888', cs)
-  ctx.globalAlpha=1
 }
 
 // ─── MAIN DRAW ───────────────────────────────────────────────────────────────
@@ -595,34 +689,79 @@ function loop(ts) {
 }
 requestAnimationFrame(loop)
 
-// ─── NICKNAME UI ─────────────────────────────────────────────────────────────
-function showNickOverlay() {
-  nickOverlay.classList.remove('hidden')
-  nickInput.value = playerNick
-  setTimeout(()=>nickInput.focus(), 100)
+// ─── SCORE OVERLAY (게임오버 후 닉네임 입력 + 랭킹 등록) ─────────────────────
+const scoreOverlay  = document.getElementById('scoreOverlay')
+const nickSection   = document.getElementById('nickSection')
+const retrySection  = document.getElementById('retrySection')
+const nickInput     = document.getElementById('nickInput')
+const submitBtn     = document.getElementById('submitBtn')
+const skipBtn       = document.getElementById('skipBtn')
+const retryBtn      = document.getElementById('retryBtn')
+const quitBtn       = document.getElementById('quitBtn')
+
+function renderLbPreview() {
+  const rows = document.getElementById('lbRows')
+  if (!leaderboard.length) { rows.textContent = '아직 기록이 없어요'; return }
+  rows.innerHTML = leaderboard.slice(0, 5).map((e, i) => {
+    const rank  = `${i+1}.`.padEnd(3, '\u00A0')
+    const nick  = e.nick.slice(0, 8).padEnd(8, '\u00A0')
+    const sc    = String(e.score).padStart(6, '\u00A0')
+    const isMe  = playerNick && e.nick.toUpperCase() === playerNick.toUpperCase()
+    return `<div class="${isMe ? 'lb-me' : ''}">${rank}${nick} ${sc}</div>`
+  }).join('')
 }
-function confirmNick() {
+
+function showScoreOverlay() {
+  document.getElementById('finalScore').textContent = score
+  document.getElementById('finalWave').textContent  = wave
+  nickSection.classList.remove('hidden')
+  retrySection.classList.add('hidden')
+  nickInput.value = ''
+  renderLbPreview()
+  scoreOverlay.classList.remove('hidden')
+  setTimeout(() => nickInput.focus(), 100)
+}
+
+function showRetrySection(msg) {
+  document.getElementById('retryScore').textContent = score
+  document.getElementById('retryWave').textContent  = wave
+  document.getElementById('retryMsg').textContent   = msg
+  nickSection.classList.add('hidden')
+  retrySection.classList.remove('hidden')
+}
+
+function hideScoreOverlay() {
+  scoreOverlay.classList.add('hidden')
+}
+
+async function doSubmit() {
   const n = nickInput.value.trim()
   if (!n) { nickInput.focus(); return }
   playerNick = n
-  localStorage.setItem('blinkfire-nick', n)
-  nickOverlay.classList.add('hidden')
-  startGame()
+  submitBtn.textContent = '등록 중...'
+  submitBtn.disabled = true
+  await submitScore(playerNick, score)
+  leaderboard = await fetchLeaderboard()
+  scoreSubmitted = true
+  submitBtn.textContent = '🏆 랭킹 등록'
+  submitBtn.disabled = false
+  showRetrySection('등록이 완료됐어요!')
 }
-nickBtn.addEventListener('click', confirmNick)
-nickInput.addEventListener('keydown', e => { if(e.key==='Enter') confirmNick() })
 
-// 게임오버 화면 탭 → 닉네임 변경
+submitBtn.addEventListener('click', doSubmit)
+nickInput.addEventListener('keydown', e => { if (e.key==='Enter') doSubmit() })
+skipBtn.addEventListener('click', () => {
+  playerNick = ''
+  showRetrySection('랭킹 등록을 건너뛰었어요')
+})
+retryBtn.addEventListener('click', () => { hideScoreOverlay(); startGame() })
+quitBtn.addEventListener('click',  () => { hideScoreOverlay() })
+
 canvas.addEventListener('click', e => {
-  if (state==='gameover') {
-    const cy=canvas.height/2
-    const lbBot=cy+42+16+Math.min(8,leaderboard.length)*14+10
-    if (e.clientY>lbBot+20) { showNickOverlay(); return }
-  }
-  if (!faceVisible) {
-    if (state==='playing') tryShoot(e.clientX,e.clientY)
-    else if (state==='start') { if(playerNick) startGame(); else showNickOverlay() }
-    else if (state==='gameover') { if(playerNick) startGame(); else showNickOverlay() }
+  if (scoreOverlay.classList.contains('hidden') && !faceVisible) {
+    if (state==='playing') tryShoot(e.clientX, e.clientY)
+    else if (state==='start') startGame()
+    else if (state==='gameover') startGame()
   }
 })
 canvas.addEventListener('mousemove', e => {
@@ -632,10 +771,11 @@ canvas.addEventListener('mouseleave', () => { if(!faceVisible) crosshair.visible
 // 터치 이벤트 (모바일)
 canvas.addEventListener('touchstart', e => {
   e.preventDefault()
-  const t=e.touches[0]
+  const t = e.touches[0]
   if (!faceVisible) {
-    if (state==='playing') tryShoot(t.clientX,t.clientY)
-    else showNickOverlay()
+    if (state==='playing') tryShoot(t.clientX, t.clientY)
+    else if (state==='start') startGame()
+    else if (state==='gameover') startGame()
   }
 }, { passive:false })
 
@@ -649,7 +789,6 @@ function eyeAR(lm,top,bot,outer,inner) {
 const BLINK_THRESH = 0.18
 const HEAD_SENS_X  = 2.2
 const HEAD_SENS_Y  = 2.0
-let noseBaselineEma = null
 
 const faceMesh = new FaceMesh({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
@@ -659,7 +798,7 @@ faceMesh.setOptions({ maxNumFaces:1, refineLandmarks:true, minDetectionConfidenc
 faceMesh.onResults(results => {
   camCtx.drawImage(results.image, 0, 0, camCv.width, camCv.height)
   if (!results.multiFaceLandmarks?.length) {
-    faceVisible=false; crosshair.visible=false; isBlinking=false; return
+    faceVisible=false; crosshair.visible=false; isBlinking=false; blinkPower=0; return
   }
   faceVisible=true
   const lm=results.multiFaceLandmarks[0]
@@ -676,57 +815,54 @@ faceMesh.onResults(results => {
   }
   crosshair.visible=true
 
-  // ── 코 찡긋 (Z축 기반) ──
-  const eyeZ=(lm[33].z+lm[362].z)/2, noseFwd=eyeZ-lm[4].z
-  if (noseBaselineEma===null) noseBaselineEma=noseFwd
-  noseBaselineEma=0.98*noseBaselineEma+0.02*noseFwd
-  if (noseFwd>noseBaselineEma+0.014 && canShoot && gameStartCooldown<=0 && state==='playing') {
-    tryShoot(crosshair.x, crosshair.y)
-  }
+  // ── 눈 깜빡임 감지 — 한쪽(윙크) vs 양쪽 ──
+  const earL = eyeAR(lm,159,145,33,133)   // 왼쪽 눈
+  const earR = eyeAR(lm,386,374,362,263)  // 오른쪽 눈
+  const leftClosed  = earL < BLINK_THRESH
+  const rightClosed = earR < BLINK_THRESH
+  const bothClosed  = leftClosed && rightClosed
+  const oneClosed   = (leftClosed || rightClosed) && !bothClosed
+  const nowBlink    = leftClosed || rightClosed
 
-  // ── 눈 깜빡임 (EAR) ──
-  const avgEAR=(eyeAR(lm,159,145,33,133)+eyeAR(lm,386,374,362,263))/2
-  const nowBlink=avgEAR<BLINK_THRESH
-  isBlinking=nowBlink
-  if (nowBlink && blinkStart===0) blinkStart=Date.now()
+  // 크로스헤어 표시용 파워 상태 업데이트
+  blinkPower = bothClosed ? 2 : oneClosed ? 1 : 0
+  isBlinking = nowBlink
+
+  if (nowBlink && blinkStart===0) {
+    blinkStart = Date.now()
+    blinkType  = bothClosed ? 2 : 1   // 감기 시작할 때 타입 결정
+  }
+  // 눈이 떠지면 → 발사 또는 게임 시작
   if (!nowBlink && blinkStart>0) {
     const dur=Date.now()-blinkStart; blinkStart=0
-    if (dur>60 && dur<450 && gameStartCooldown<=0 && state==='playing') tryShoot(crosshair.x,crosshair.y)
-    else if (dur>=800) {
-      if (state==='start'||state==='gameover') { if(playerNick) startGame(); else showNickOverlay() }
+    if (dur>60 && dur<450 && gameStartCooldown<=0 && state==='playing') {
+      tryShoot(crosshair.x, crosshair.y, blinkType)
+    } else if (dur>=800) {
+      if ((state==='start' || state==='gameover') && scoreOverlay.classList.contains('hidden')) startGame()
     }
+    blinkType=0
   }
 })
 
-// ─── CAMERA (모바일 전면카메라 지원) ────────────────────────────────────────
-async function startCamera() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode:'user', width:{ideal:640}, height:{ideal:480} }
-    })
-    video.srcObject = stream
-    video.addEventListener('loadeddata', async () => {
+// ─── CAMERA ──────────────────────────────────────────────────────────────────
+function startCamera() {
+  const cam = new Camera(video, {
+    onFrame: async () => {
+      camCv.width = 200; camCv.height = 150
+      await faceMesh.send({ image: video })
+    },
+    width: 640, height: 480,
+  })
+  cam.start()
+    .then(() => {
       loading.classList.add('hidden')
-      // 닉네임이 없으면 입력 요청
-      if (!playerNick) showNickOverlay()
-      // 초기 랭킹 불러오기
       fetchLeaderboard().then(lb => { leaderboard=lb; lbLoaded=true })
-      // 프레임 루프
-      async function processFrame() {
-        if (video.readyState>=2) {
-          camCv.width=200; camCv.height=150
-          await faceMesh.send({image:video})
-        }
-        requestAnimationFrame(processFrame)
-      }
-      processFrame()
     })
-  } catch(e) {
-    loading.querySelector('.sub').textContent='카메라 오류 — 터치/클릭으로도 플레이 가능해요'
-    loading.querySelector('.hint').textContent='닉네임 입력 후 화면 터치로 시작'
-    setTimeout(()=>{ loading.classList.add('hidden'); showNickOverlay() }, 2000)
-    fetchLeaderboard().then(lb => { leaderboard=lb })
-  }
+    .catch(() => {
+      loading.querySelector('.sub').textContent = '카메라 오류 — 터치/클릭으로도 플레이 가능해요'
+      setTimeout(() => { loading.classList.add('hidden') }, 2000)
+      fetchLeaderboard().then(lb => { leaderboard=lb })
+    })
 }
 startCamera()
 </script>
