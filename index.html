@@ -942,7 +942,7 @@ function drawWaveBanner() {
 // ─── LEADERBOARD DRAW ────────────────────────────────────────────────────────
 // ctx.fillText 사용 — 한글 포함 모든 닉네임 표시 가능
 function drawLeaderboard(cx, startY, highlightNick, maxRows=20) {
-  const rowH=18, font='13px "Courier New", monospace'
+  const rowH=14, font='11px "Courier New", monospace'
   ctx.font = '700 11px "Courier New", monospace'
   ctx.textAlign = 'center'
   ctx.fillStyle = '#ffeb3b'
@@ -955,42 +955,29 @@ function drawLeaderboard(cx, startY, highlightNick, maxRows=20) {
     ctx.globalAlpha=1; ctx.textAlign='left'; return
   }
 
-  // 11개 이상이면 2열 표시
+  // 단일 열, 닉네임 잘라내지 않음
   const entries = leaderboard.slice(0, maxRows)
-  const twoCol = entries.length > 10
-  const half = twoCol ? Math.ceil(entries.length / 2) : entries.length
-
-  // 열 중심: cx 기준 ±spread (화면 크기에 따라 조정, 최대 160px)
-  const spread = Math.min(canvas.width * 0.23, 160)
-  const colL = cx - spread
-  const colR = cx + spread
+  const nickX = cx - 110
+  const scoreX = cx + 110
 
   ctx.font = font
   entries.forEach((entry, i) => {
-    const col   = twoCol ? (i < half ? 0 : 1) : 0
-    const row   = twoCol ? (i < half ? i : i - half) : i
-    const colCx = twoCol ? (col === 0 ? colL : colR) : cx
-    const y     = startY + 26 + row * rowH
+    const y     = startY + 24 + i * rowH
     const isMe  = highlightNick && entry.nick.toLowerCase() === highlightNick.toLowerCase()
     const color = isMe ? '#00ff88' : (i===0?'#ffd700': i===1?'#c0c0c0': i===2?'#cd7f32':'#bbb')
 
     if (isMe) {
       ctx.fillStyle = 'rgba(0,255,136,0.10)'
-      ctx.fillRect(colCx-52, y-13, 104, rowH)
+      ctx.fillRect(nickX-28, y-11, scoreX-nickX+56, rowH)
     }
 
     ctx.fillStyle = color
     ctx.textAlign = 'right'
-    ctx.fillText(`${i+1}.`, colCx-50, y)
+    ctx.fillText(`${i+1}.`, nickX-6, y)
     ctx.textAlign = 'left'
-    // 실제 픽셀 폭 기준으로 닉네임 잘라내기 (한글 대응)
-    const maxNickW = 44
-    let dn = entry.nick
-    while (dn.length > 1 && ctx.measureText(dn + '…').width > maxNickW) dn = dn.slice(0,-1)
-    if (dn.length < entry.nick.length) dn += '…'
-    ctx.fillText(dn, colCx-42, y)
+    ctx.fillText(entry.nick, nickX, y)
     ctx.textAlign = 'right'
-    ctx.fillText(entry.score.toLocaleString(), colCx+76, y)
+    ctx.fillText(entry.score.toLocaleString(), scoreX, y)
   })
   ctx.textAlign = 'left'
 }
