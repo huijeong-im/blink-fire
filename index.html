@@ -182,8 +182,8 @@
   <div id="camGuide">
     <div class="cg-arrow">▲ ▲ ▲</div>
     <div class="cg-text">
-      주소창 왼쪽 <em>🔒 아이콘</em>을 클릭하고<br>
-      <em>카메라</em>를 허용으로 바꿔주세요
+      주소창 오른쪽 <em>차단된 카메라 아이콘</em>을 클릭하고<br>
+      <em>카메라 → 허용</em>으로 바꾼 뒤 새로고침 해주세요
     </div>
   </div>
 </div>
@@ -987,8 +987,8 @@ function startCamera() {
       window.alert = _alert
       cameraActive = false
       // 주소창 안내 메시지 표시 → 5초 후 게임으로 진입
-      loading.querySelector('.px-sub').textContent  = '카메라 권한이 필요해요'
-      loading.querySelector('.px-hint').textContent = '아래 안내 후 새로고침 해주세요'
+      loading.querySelector('.px-sub').textContent  = '카메라가 차단돼 있어요'
+      loading.querySelector('.px-hint').textContent = '아래 안내를 따라주세요'
       camGuide.style.display = 'block'
       fetchLeaderboard().then(lb => { leaderboard=lb })
       setTimeout(() => loading.classList.add('hidden'), 5000)
