@@ -271,7 +271,7 @@ async function submitScore(nick, sc) {
 }
 
 async function fetchLeaderboard() {
-  const raw = await upstashGet('zrevrange', LB_KEY, 0, 14, 'withscores')
+  const raw = await upstashGet('zrevrange', LB_KEY, 0, 19, 'withscores')
   if (!Array.isArray(raw)) return []
   const entries = []
   for (let i = 0; i < raw.length; i += 2) {
@@ -808,7 +808,7 @@ function drawWaveBanner() {
 
 // ─── LEADERBOARD DRAW ────────────────────────────────────────────────────────
 // ctx.fillText 사용 — 한글 포함 모든 닉네임 표시 가능
-function drawLeaderboard(cx, startY, highlightNick, maxRows=8) {
+function drawLeaderboard(cx, startY, highlightNick, maxRows=20) {
   const rowH=18, font='13px "Courier New", monospace'
   ctx.font = '700 11px "Courier New", monospace'
   ctx.textAlign = 'center'
@@ -884,7 +884,7 @@ function drawStartScreen() {
   drawSprite('skeleton',cx+40,cy+100)
 
   // Leaderboard
-  drawLeaderboard(cx, cy+145, playerNick, 5)
+  drawLeaderboard(cx, cy+145, playerNick, 20)
 }
 
 // ─── GAME OVER SCREEN ────────────────────────────────────────────────────────
