@@ -94,7 +94,7 @@
     .go-nums span { color: var(--yellow); }
 
     .go-desc {
-      font-family: var(--ko); font-size: 11px; color: #444;
+      font-family: var(--ko); font-size: 11px; color: #999;
       text-align: center; line-height: 1.9;
       border-top: 1px solid var(--dim); padding-top: 10px; width: 100%;
     }
@@ -109,7 +109,7 @@
       font-family: var(--px); font-size: 7px;
       color: var(--yellow); letter-spacing: 3px; margin-bottom: 7px;
     }
-    #lbPreview .lb-rows  { font-family: var(--ko); font-size: 11px; line-height: 2; color: #555; }
+    #lbPreview .lb-rows  { font-family: var(--ko); font-size: 11px; line-height: 2; color: #bbb; }
     #lbPreview .lb-me    { color: var(--green); }
 
     /* 입력창 */
@@ -121,7 +121,7 @@
       outline: none; letter-spacing: 2px; caret-color: var(--yellow);
     }
     #nickInput:focus { border-color: var(--yellow); }
-    #nickInput::placeholder { color: #252535; font-size: 11px; letter-spacing: 1px; }
+    #nickInput::placeholder { color: #666; font-size: 11px; letter-spacing: 1px; }
 
     /* 버튼 — 프라이머리 */
     .px-btn {
@@ -136,11 +136,11 @@
 
     /* 버튼 — 고스트 */
     .px-btn-ghost {
-      background: none; border: 1px solid #252535; border-radius: 0;
-      color: #444; cursor: pointer; font-family: var(--ko);
+      background: none; border: 1px solid #444; border-radius: 0;
+      color: #aaa; cursor: pointer; font-family: var(--ko);
       font-size: 11px; padding: 8px; width: 100%; letter-spacing: 1px;
     }
-    .px-btn-ghost:hover { color: #777; border-color: #444; }
+    .px-btn-ghost:hover { color: #fff; border-color: #888; }
 
     /* 섹션 show/hide */
     #retrySection { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
@@ -826,7 +826,7 @@ function drawLeaderboard(cx, startY, highlightNick, maxRows=20) {
   leaderboard.slice(0, maxRows).forEach((entry, i) => {
     const y = startY + 26 + i * rowH
     const isMe = highlightNick && entry.nick.toLowerCase() === highlightNick.toLowerCase()
-    const color = isMe ? '#00ff88' : (i===0?'#ffd700': i===1?'#c0c0c0': i===2?'#cd7f32':'#888')
+    const color = isMe ? '#00ff88' : (i===0?'#ffd700': i===1?'#c0c0c0': i===2?'#cd7f32':'#bbb')
 
     if (isMe) {
       ctx.fillStyle = 'rgba(0,255,136,0.10)'
