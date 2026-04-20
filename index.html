@@ -109,6 +109,8 @@
       font-family: var(--px); font-size: 7px;
       color: var(--yellow); letter-spacing: 3px; margin-bottom: 7px;
     }
+    #lbPreview .lb-cols  { display: flex; gap: 12px; }
+    #lbPreview .lb-col   { flex: 1; }
     #lbPreview .lb-rows  { font-family: var(--ko); font-size: 11px; line-height: 2; color: #bbb; }
     #lbPreview .lb-me    { color: var(--green); }
 
@@ -209,21 +211,22 @@
       </div>
       <div id="lbPreview">
         <div class="lb-title">-- TOP 20 --</div>
-        <div class="lb-rows" id="lbRows">로딩 중...</div>
+        <div class="lb-cols">
+          <div class="lb-col lb-rows" id="lbRowsA">로딩 중...</div>
+          <div class="lb-col lb-rows" id="lbRowsB"></div>
+        </div>
       </div>
       <!-- 닉네임 입력 (등록 전) -->
       <div id="nickForm">
-        <div class="go-desc">닉네임을 입력하면 랭킹에 등록돼요<br>등록 안 해도 계속 플레이할 수 있어요</div>
+        <div class="go-desc">닉네임을 입력하면 랭킹에 등록돼요</div>
         <input id="nickInput" type="text" placeholder="닉네임 입력 (최대 10자)"
                maxlength="10" autocomplete="off" autocorrect="off" spellcheck="false">
         <button id="submitBtn" class="px-btn">SUBMIT SCORE</button>
-        <button id="skipBtn" class="px-btn-ghost">건너뛰기 (등록 안 함)</button>
       </div>
       <!-- 등록 완료 메시지 (등록 후) -->
       <div id="doneMsg" class="hidden retry-msg"></div>
-      <!-- 항상 표시 -->
+      <!-- PLAY AGAIN 항상 표시 -->
       <button id="retryBtn" class="px-btn">PLAY AGAIN</button>
-      <button id="quitBtn" class="px-btn-ghost">그만하기</button>
     </div>
   </div>
 </div>
@@ -1100,21 +1103,22 @@ const scoreOverlay = document.getElementById('scoreOverlay')
 const nickInput    = document.getElementById('nickInput')
 const nickForm     = document.getElementById('nickForm')
 const submitBtn    = document.getElementById('submitBtn')
-const skipBtn      = document.getElementById('skipBtn')
 const doneMsg      = document.getElementById('doneMsg')
 const retryBtn     = document.getElementById('retryBtn')
-const quitBtn      = document.getElementById('quitBtn')
 
 function renderLbPreview() {
-  const rows = document.getElementById('lbRows')
-  if (!leaderboard.length) { rows.textContent = '아직 기록이 없어요'; return }
-  rows.innerHTML = leaderboard.slice(0, 20).map((e, i) => {
-    const rank = `${i+1}.`.padEnd(3, '\u00A0')
-    const nick = e.nick.slice(0, 8).padEnd(8, '\u00A0')
-    const sc   = String(e.score).padStart(6, '\u00A0')
+  const rowsA = document.getElementById('lbRowsA')
+  const rowsB = document.getElementById('lbRowsB')
+  if (!leaderboard.length) { rowsA.textContent = '아직 기록이 없어요'; rowsB.textContent=''; return }
+  const makeRow = (e, i) => {
+    const rank = `${i+1}.`
+    const nick = e.nick.slice(0, 7)
+    const sc   = e.score.toLocaleString()
     const isMe = playerNick && e.nick.toUpperCase() === playerNick.toUpperCase()
-    return `<div class="${isMe ? 'lb-me' : ''}">${rank}${nick} ${sc}</div>`
-  }).join('')
+    return `<div class="${isMe?'lb-me':''}">${rank} ${nick} <span style="float:right">${sc}</span></div>`
+  }
+  rowsA.innerHTML = leaderboard.slice(0, 10).map(makeRow).join('')
+  rowsB.innerHTML = leaderboard.slice(10, 20).map((e,i) => makeRow(e, i+10)).join('')
 }
 
 function showScoreOverlay() {
@@ -1155,9 +1159,7 @@ async function doSubmit() {
 
 submitBtn.addEventListener('click', doSubmit)
 nickInput.addEventListener('keydown', e => { if (e.key==='Enter') doSubmit() })
-skipBtn.addEventListener('click', () => { playerNick = ''; showDone('건너뛰었어요. 다시 도전해보세요!') })
 retryBtn.addEventListener('click', () => { hideScoreOverlay(); startGame() })
-quitBtn.addEventListener('click',  () => { hideScoreOverlay() })
 
 canvas.addEventListener('click', e => {
   if (scoreOverlay.classList.contains('hidden') && !faceVisible) {
