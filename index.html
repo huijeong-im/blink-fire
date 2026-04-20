@@ -935,6 +935,10 @@ faceMesh.onResults(results => {
 
 // ─── CAMERA ──────────────────────────────────────────────────────────────────
 function startCamera() {
+  // MediaPipe Camera 유틸리티는 실패 시 alert()를 내부 호출 — 게임 스타일로 직접 처리
+  const _alert = window.alert
+  window.alert = () => {}   // alert 일시 차단
+
   const cam = new Camera(video, {
     onFrame: async () => {
       camCv.width = 200; camCv.height = 150
@@ -942,14 +946,19 @@ function startCamera() {
     },
     width: 640, height: 480,
   })
+
   cam.start()
     .then(() => {
+      window.alert = _alert
       loading.classList.add('hidden')
       fetchLeaderboard().then(lb => { leaderboard=lb; lbLoaded=true })
     })
     .catch(() => {
-      loading.querySelector('.sub').textContent = '카메라 오류 — 터치/클릭으로도 플레이 가능해요'
-      setTimeout(() => { loading.classList.add('hidden') }, 2000)
+      window.alert = _alert
+      // 로딩 화면에 에러 메시지 표시 후 게임으로 진입
+      loading.querySelector('.px-sub').textContent  = '카메라 없이도 플레이 가능해요'
+      loading.querySelector('.px-hint').textContent = '화면 클릭 / 터치로 시작하세요'
+      setTimeout(() => { loading.classList.add('hidden') }, 3000)
       fetchLeaderboard().then(lb => { leaderboard=lb })
     })
 }
