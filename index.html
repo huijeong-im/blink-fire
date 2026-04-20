@@ -1021,6 +1021,9 @@ function drawStartScreen() {
 
 // ─── GAME OVER SCREEN ────────────────────────────────────────────────────────
 function drawGameOver() {
+  // scoreOverlay(HTML 랭킹 화면)가 열려 있으면 캔버스 화면 생략
+  if (!document.getElementById('scoreOverlay').classList.contains('hidden')) return
+
   const cx=canvas.width/2, cy=canvas.height/2
 
   const go='GAME OVER', gs=6
@@ -1042,15 +1045,11 @@ function drawGameOver() {
     }
   }
 
-  // Leaderboard
-  drawLeaderboard(cx, cy+42, playerNick)
-
-  // Retry — 오버레이가 닫힌 후에만 표시
-  const lbBot = cy+42 + 26 + Math.min(8, leaderboard.length)*18 + 10
-  if (document.getElementById('scoreOverlay').classList.contains('hidden')) {
+  // Retry — 쿨다운 끝난 후에만 표시
+  if (gameOverCooldown <= 0) {
     const rtt='BLINK LONG TO RETRY', rs2=2
     ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
-    drawText(rtt, cx-textW(rtt,rs2)/2, lbBot+8, '#00ff88', rs2)
+    drawText(rtt, cx-textW(rtt,rs2)/2, cy+50, '#00ff88', rs2)
     ctx.globalAlpha=1
   }
 
