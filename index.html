@@ -172,13 +172,13 @@
 
     #muteBtn {
       position: fixed; bottom: 14px; left: 14px; z-index: 20;
-      font-family: var(--px); font-size: 16px;
+      font-family: var(--px); font-size: 13px;
       background: #0a0a1a; border: 2px solid #00ff88; border-radius: 0;
-      color: #00ff88; cursor: pointer; padding: 8px 20px; letter-spacing: 2px;
-      box-shadow: 0 0 10px rgba(0,255,136,0.35);
+      color: #00ff88; cursor: pointer; padding: 6px 12px; letter-spacing: 1px;
+      box-shadow: 0 0 8px rgba(0,255,136,0.3);
       transition: color .1s, border-color .1s, box-shadow .1s;
     }
-    #muteBtn:hover { color: var(--yellow); border-color: var(--yellow); box-shadow: 0 0 10px rgba(255,235,59,0.4); }
+    #muteBtn:hover { color: var(--yellow); border-color: var(--yellow); box-shadow: 0 0 8px rgba(255,235,59,0.4); }
     #muteBtn.muted { color: #444; border-color: #333; box-shadow: none; }
 
     @keyframes px-blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
@@ -242,7 +242,7 @@
 <canvas id="gameCanvas"></canvas>
 <video id="video" autoplay playsinline muted></video>
 <canvas id="camCanvas" width="200" height="150"></canvas>
-<button id="muteBtn">♪ ON</button>
+<button id="muteBtn">SOUND ON</button>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -474,7 +474,7 @@ const BGM = (() => {
 const muteBtn = document.getElementById('muteBtn')
 function toggleMute() {
   const muted = BGM.toggle()
-  muteBtn.textContent = muted ? '♪ OFF' : '♪ ON'
+  muteBtn.textContent = muted ? 'SOUND OFF' : 'SOUND ON'
   muteBtn.classList.toggle('muted', muted)
 }
 muteBtn.addEventListener('click', toggleMute)
