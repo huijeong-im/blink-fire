@@ -405,6 +405,64 @@ const SFX = {
   gameStart()  { _seq([{f:330,d:0.08},{f:440,d:0.08},{f:550,d:0.08},{f:660,d:0.15}]) },
 }
 
+// ─── BGM (배경음악) ──────────────────────────────────────────────────────────
+const BGM = (() => {
+  const BPM=140, B=60/BPM
+
+  // 멜로디 [Hz, 박자] — 0=쉼표 / 총 16박자
+  const MEL = [
+    [784,0.5],[659,0.5],[698,0.5],[784,0.5],  // G5 E5 F5 G5
+    [880,0.5],[784,0.5],[698,0.5],[659,0.5],  // A5 G5 F5 E5
+    [587,0.5],[659,0.5],[698,0.5],[784,0.5],  // D5 E5 F5 G5
+    [659,0.5],[0,0.5],[659,0.5],[0,0.5],      // E5 _ E5 _
+    [784,0.5],[659,0.5],[698,0.5],[784,0.5],  // G5 E5 F5 G5
+    [880,1  ],[784,0.5],[698,0.5],            // A5(긴) G5 F5
+    [659,1  ],[587,0.5],[523,0.5],            // E5(긴) D5 C5
+    [523,2  ],                                // C5(홀드)
+  ]  // 합계: 16박자
+
+  // 베이스 [Hz, 박자] — 총 16박자
+  const BAS = [
+    [196,1],[165,1],[175,1],[196,1],
+    [196,1],[165,1],[175,1],[196,1],
+    [147,1],[165,1],[175,1],[196,1],
+    [165,2],[131,2],
+  ]  // 합계: 16박자
+
+  let active=false, muted=false, loopTimer=null
+
+  function note(freq, t, dur, vol, type='square') {
+    if (!freq || muted) return
+    const o=_ac.createOscillator(), g=_ac.createGain()
+    o.connect(g); g.connect(_ac.destination)
+    o.type=type; o.frequency.value=freq
+    g.gain.setValueAtTime(vol, t)
+    g.gain.exponentialRampToValueAtTime(0.001, t+dur*0.85)
+    o.start(t); o.stop(t+dur)
+  }
+
+  function scheduleLoop(startTime) {
+    if (!active) return
+    let mt=startTime
+    MEL.forEach(([f,b])=>{ note(f, mt, b*B*0.85, 0.09); mt+=b*B })
+    let bt=startTime
+    BAS.forEach(([f,b])=>{ note(f, bt, b*B*0.55, 0.06,'triangle'); bt+=b*B })
+    loopTimer = setTimeout(()=>scheduleLoop(startTime+(mt-startTime)), (mt-startTime-0.3)*1000)
+  }
+
+  return {
+    start()  { if(active)return; active=true; _ac.resume().then(()=>scheduleLoop(_ac.currentTime+0.1)) },
+    stop()   { active=false; clearTimeout(loopTimer) },
+    toggle() { muted=!muted; return muted },
+    isMuted(){ return muted },
+  }
+})()
+
+// M키 — 뮤트 토글
+window.addEventListener('keydown', e => {
+  if (e.key==='m'||e.key==='M') BGM.toggle()
+})
+
 // ─── GAME STATE ──────────────────────────────────────────────────────────────
 let playerNick    = ''   // 게임오버 후 입력, 매 게임마다 초기화
 let leaderboard   = []
@@ -522,6 +580,7 @@ function tryShoot(x, y, power = 1) {
 // ─── GAME LOGIC ──────────────────────────────────────────────────────────────
 function startGame() {
   SFX.gameStart()
+  BGM.start()
   playerNick=''   // 매 게임마다 닉네임 초기화
   score=0; lives=3; wave=1
   enemies=[]; particles=[]; flashes=[]; scorePopups=[]
@@ -539,6 +598,7 @@ function loseLife() {
   lives--; flashScreen=0.5
   if (lives<=0) {
     SFX.gameOver()
+    BGM.stop()
     state='gameover'
     fetchLeaderboard().then(lb => { leaderboard=lb; showScoreOverlay() })
   } else {
@@ -664,6 +724,12 @@ function drawHUD() {
     const hx=canvas.width-pad-(3-i)*(SP.heart.w*SC+6)
     drawSprite('heart',hx,pad,0,i<lives?null:'#1a1a2e')
   }
+  // 뮤트 표시 (우하단)
+  const muteLabel = BGM.isMuted() ? 'MUTE' : 'M:MUTE'
+  ctx.font = '700 8px "Courier New"'; ctx.textAlign='right'
+  ctx.fillStyle = BGM.isMuted() ? '#ff5555' : '#333'
+  ctx.fillText(muteLabel, canvas.width-pad, canvas.height-pad)
+
   // 콤보 표시
   if (comboCount>=2) {
     const ct=`x${comboCount} COMBO!`, cs=3
