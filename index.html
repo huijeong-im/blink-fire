@@ -985,39 +985,39 @@ function drawLeaderboard(cx, startY, highlightNick, maxRows=20) {
 function drawStartScreen() {
   const cx=canvas.width/2, cy=canvas.height/2
 
+  // Title
   const title='BLINK FIRE', ts=6
-  drawText(title, cx-textW(title,ts)/2+3, cy-120+3, '#000', ts)
-  drawText(title, cx-textW(title,ts)/2, cy-120, '#ffeb3b', ts)
+  drawText(title, cx-textW(title,ts)/2+3, cy-180+3, '#000', ts)
+  drawText(title, cx-textW(title,ts)/2,   cy-180,   '#ffeb3b', ts)
 
+  // Instructions
   const lines=[
-    {t:'고개를 움직여 조준',   c:'#aaa',s:2},
-    {t:'MOVE YOUR HEAD TO AIM',c:'#555',s:2},
-    {t:'',c:'',s:2},
-    {t:'눈 깜빡이면 발사',    c:'#aaa',s:2},
-    {t:'BLINK TO SHOOT',      c:'#555',s:2},
+    {t:'MOVE YOUR HEAD TO AIM', c:'#666', s:2},
+    {t:'BLINK TO SHOOT',        c:'#666', s:2},
   ]
-  lines.forEach((l,i)=>{ if(!l.t)return; drawText(l.t,cx-textW(l.t,l.s)/2,cy-30+i*18,l.c,l.s) })
+  lines.forEach((l,i)=>{ drawText(l.t, cx-textW(l.t,l.s)/2, cy-110+i*22, l.c, l.s) })
 
+  // Sprites
+  drawSprite('slime',    cx-72, cy-58)
+  drawSprite('bat',      cx-12, cy-54)
+  drawSprite('skeleton', cx+44, cy-58)
+
+  // BLINK LONG TO START
   const st='BLINK LONG TO START', ss=3
   ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
-  drawText(st,cx-textW(st,ss)/2,cy+70,'#00ff88',ss)
+  drawText(st, cx-textW(st,ss)/2, cy-10, '#00ff88', ss)
   ctx.globalAlpha=1
 
   // 2P 감지 표시
   if (face2Visible) {
     const p2t='2P DETECTED!', p2s=2
     ctx.globalAlpha=0.7+0.3*Math.sin(Date.now()/300)
-    drawText(p2t,cx-textW(p2t,p2s)/2,cy+98,'#00e5ff',p2s)
+    drawText(p2t, cx-textW(p2t,p2s)/2, cy+18, '#00e5ff', p2s)
     ctx.globalAlpha=1
   }
 
-  // Sprites
-  drawSprite('slime',   cx-80,cy+100)
-  drawSprite('bat',     cx-20,cy+105)
-  drawSprite('skeleton',cx+40,cy+100)
-
-  // Leaderboard
-  drawLeaderboard(cx, cy+145, playerNick, 20)
+  // Leaderboard (top 5 on start screen)
+  drawLeaderboard(cx, cy+40, playerNick, 5)
 }
 
 // ─── GAME OVER SCREEN ────────────────────────────────────────────────────────
