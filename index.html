@@ -170,6 +170,16 @@
       font-style: normal; color: var(--yellow);
     }
 
+    #muteBtn {
+      position: fixed; bottom: 12px; right: 12px; z-index: 20;
+      font-family: var(--px); font-size: 10px;
+      background: #0a0a1a; border: 2px solid #2a2a3a; border-radius: 0;
+      color: #aaa; cursor: pointer; padding: 6px 10px;
+      transition: color .1s, border-color .1s;
+    }
+    #muteBtn:hover { color: var(--yellow); border-color: var(--yellow); }
+    #muteBtn.muted { color: #555; border-color: #333; }
+
     @keyframes px-blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
   </style>
 </head>
@@ -231,6 +241,7 @@
 <canvas id="gameCanvas"></canvas>
 <video id="video" autoplay playsinline muted></video>
 <canvas id="camCanvas" width="200" height="150"></canvas>
+<button id="muteBtn">♪</button>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -458,10 +469,15 @@ const BGM = (() => {
   }
 })()
 
-// M키 — 뮤트 토글
-window.addEventListener('keydown', e => {
-  if (e.key==='m'||e.key==='M') BGM.toggle()
-})
+// 뮤트 버튼 + M키
+const muteBtn = document.getElementById('muteBtn')
+function toggleMute() {
+  const muted = BGM.toggle()
+  muteBtn.textContent = muted ? '♪ OFF' : '♪'
+  muteBtn.classList.toggle('muted', muted)
+}
+muteBtn.addEventListener('click', toggleMute)
+window.addEventListener('keydown', e => { if (e.key==='m'||e.key==='M') toggleMute() })
 
 // ─── GAME STATE ──────────────────────────────────────────────────────────────
 let playerNick    = ''   // 게임오버 후 입력, 매 게임마다 초기화
@@ -724,12 +740,6 @@ function drawHUD() {
     const hx=canvas.width-pad-(3-i)*(SP.heart.w*SC+6)
     drawSprite('heart',hx,pad,0,i<lives?null:'#1a1a2e')
   }
-  // 뮤트 표시 (우하단)
-  const muteLabel = BGM.isMuted() ? 'MUTE' : 'M:MUTE'
-  ctx.font = '700 8px "Courier New"'; ctx.textAlign='right'
-  ctx.fillStyle = BGM.isMuted() ? '#ff5555' : '#333'
-  ctx.fillText(muteLabel, canvas.width-pad, canvas.height-pad)
-
   // 콤보 표시
   if (comboCount>=2) {
     const ct=`x${comboCount} COMBO!`, cs=3
