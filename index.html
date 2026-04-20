@@ -366,6 +366,45 @@ function drawStars() {
   }
 }
 
+// ─── SOUND ENGINE (Web Audio API 칩튠) ───────────────────────────────────────
+const _ac = new (window.AudioContext || window.webkitAudioContext)()
+
+function _beep(freq, dur, vol=0.3, type='square', freqEnd=null) {
+  const o=_ac.createOscillator(), g=_ac.createGain()
+  o.connect(g); g.connect(_ac.destination)
+  o.type=type; o.frequency.setValueAtTime(freq, _ac.currentTime)
+  if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, _ac.currentTime+dur)
+  g.gain.setValueAtTime(vol, _ac.currentTime)
+  g.gain.exponentialRampToValueAtTime(0.001, _ac.currentTime+dur)
+  o.start(); o.stop(_ac.currentTime+dur)
+}
+function _seq(notes) {   // [{f, d, v?, t?}]
+  let t=_ac.currentTime
+  notes.forEach(n => {
+    const o=_ac.createOscillator(), g=_ac.createGain()
+    o.connect(g); g.connect(_ac.destination)
+    o.type=n.t||'square'
+    o.frequency.setValueAtTime(n.f, t)
+    if (n.f2) o.frequency.exponentialRampToValueAtTime(n.f2, t+n.d)
+    g.gain.setValueAtTime(n.v||0.25, t)
+    g.gain.exponentialRampToValueAtTime(0.001, t+n.d)
+    o.start(t); o.stop(t+n.d)
+    t+=n.d
+  })
+}
+
+const SFX = {
+  shootWeak()  { _beep(520, 0.07, 0.18, 'square', 880) },
+  shootStrong(){ _beep(180, 0.05, 0.35, 'square', 80); _beep(440, 0.12, 0.20, 'square', 220) },
+  hit()        { _beep(300, 0.05, 0.15, 'square', 250) },
+  kill()       { _beep(600, 0.08, 0.22, 'square', 200) },
+  combo(n)     { _beep(300+n*60, 0.09, 0.22, 'square') },
+  loseLife()   { _seq([{f:320,d:0.12},{f:240,d:0.12},{f:160,d:0.22}]) },
+  waveClear()  { _seq([{f:330,d:0.1},{f:440,d:0.1},{f:550,d:0.1},{f:660,d:0.22}]) },
+  gameOver()   { _seq([{f:440,d:0.15},{f:330,d:0.15},{f:220,d:0.15},{f:110,d:0.35}]) },
+  gameStart()  { _seq([{f:330,d:0.08},{f:440,d:0.08},{f:550,d:0.08},{f:660,d:0.15}]) },
+}
+
 // ─── GAME STATE ──────────────────────────────────────────────────────────────
 let playerNick    = ''   // 게임오버 후 입력, 매 게임마다 초기화
 let leaderboard   = []
@@ -446,6 +485,7 @@ function tryShoot(x, y, power = 1) {
   const flashColor = isStrong ? '#ff8c00' : '#ffe57f'
   flashScreen      = isStrong ? 0.55 : 0.22
 
+  if (isStrong) SFX.shootStrong(); else SFX.shootWeak()
   muzzleFlashes.push({x, y, life:1, size:flashSize, strong:isStrong})
   if (isStrong) {
     muzzleFlashes.push({x, y, life:0.7, size:flashSize*1.4, strong:true})
@@ -462,6 +502,7 @@ function tryShoot(x, y, power = 1) {
         const pts   = ESCORE[e.type] * wave * combo
         score += pts
         comboCount++; comboTimer = COMBO_WINDOW
+        if (comboCount >= 3) SFX.combo(Math.min(comboCount, 8)); else SFX.kill()
         spawnParticles(e.x, e.y, ECOLOR[e.type], isStrong ? 32 : 18)
         shockwaves.push({x:e.x,y:e.y,r:0,life:1,     color:ECOLOR[e.type]})
         shockwaves.push({x:e.x,y:e.y,r:0,life:0.7,   color:'#fff'})
@@ -469,7 +510,7 @@ function tryShoot(x, y, power = 1) {
         const label = combo>=2 ? `+${pts} x${combo}!` : `+${pts}`
         scorePopups.push({x:e.x,y:e.y-10,text:label,life:1,combo:combo>=2})
         enemies.splice(i,1); shakeAmount = isStrong ? 14 : 7
-      } else { shakeAmount = isStrong ? 7 : 4 }
+      } else { shakeAmount = isStrong ? 7 : 4; SFX.hit() }
       hit=true; break
     }
   }
@@ -480,6 +521,7 @@ function tryShoot(x, y, power = 1) {
 
 // ─── GAME LOGIC ──────────────────────────────────────────────────────────────
 function startGame() {
+  SFX.gameStart()
   playerNick=''   // 매 게임마다 닉네임 초기화
   score=0; lives=3; wave=1
   enemies=[]; particles=[]; flashes=[]; scorePopups=[]
@@ -490,14 +532,17 @@ function startGame() {
   scoreSubmitted=false; state='playing'
 }
 function nextWave() {
+  SFX.waveClear()
   wave++; waveConfig(wave); spawned=0; spawnTimer=0; waveDelay=3; state='waveclear'
 }
 function loseLife() {
   lives--; flashScreen=0.5
   if (lives<=0) {
+    SFX.gameOver()
     state='gameover'
-    // 랭킹 갱신 후 점수 제출 오버레이 표시
     fetchLeaderboard().then(lb => { leaderboard=lb; showScoreOverlay() })
+  } else {
+    SFX.loseLife()
   }
 }
 
