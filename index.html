@@ -960,9 +960,10 @@ function drawLeaderboard(cx, startY, highlightNick, maxRows=20) {
   const twoCol = entries.length > 10
   const half = twoCol ? Math.ceil(entries.length / 2) : entries.length
 
-  // 열 중심을 캔버스 너비 기준으로 계산 (겹침 방지)
-  const colL = canvas.width * 0.27
-  const colR = canvas.width * 0.73
+  // 열 중심: cx 기준 ±spread (화면 크기에 따라 조정, 최대 160px)
+  const spread = Math.min(canvas.width * 0.23, 160)
+  const colL = cx - spread
+  const colR = cx + spread
 
   ctx.font = font
   entries.forEach((entry, i) => {
