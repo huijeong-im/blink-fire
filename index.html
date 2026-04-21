@@ -396,7 +396,7 @@ const stars = Array.from({length:100}, () => ({
   s: Math.random()<0.2?2:1, v: 0.3+Math.random()*0.6, b: 0.3+Math.random()*0.7,
 }))
 function updateStars(dt) {
-  for (const st of stars) { st.x -= st.v; if (st.x<0) {st.x=canvas.width; st.y=Math.random()*canvas.height} }
+  for (const st of stars) { st.y += st.v; if (st.y>canvas.height) {st.y=0; st.x=Math.random()*canvas.width} }
 }
 function drawStars() {
   for (const st of stars) {
