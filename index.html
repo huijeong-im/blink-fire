@@ -566,11 +566,11 @@ let paused            = false
 const ETYPES = ['slime','bat','skeleton']
 const EHP    = { slime:1, bat:1, skeleton:3 }
 const ESCORE = { slime:10, bat:15, skeleton:30 }
-const ESPEED = { slime:75, bat:130, skeleton:55 }
+const ESPEED = { slime:58, bat:100, skeleton:42 }
 const ECOLOR = { slime:'#4caf50', bat:'#9c27b0', skeleton:'#eceff1' }
 
 function waveConfig(w) {
-  waveSize = 5 + w*2; spawnGap = Math.max(0.7, 1.8 - w*0.08)
+  waveSize = 4 + w; spawnGap = Math.max(1.0, 2.2 - w*0.08)
 }
 function spawnEnemy() {
   const type = ETYPES[Math.floor(Math.random()*ETYPES.length)]
@@ -578,7 +578,7 @@ function spawnEnemy() {
   enemies.push({
     type, x: margin+Math.random()*(canvas.width-margin*2), y: -30,
     hp: EHP[type]+Math.floor(wave/4), maxHp: EHP[type]+Math.floor(wave/4),
-    speed: ESPEED[type]*(1+wave*0.12)*(0.85+Math.random()*0.3),
+    speed: ESPEED[type]*(1+wave*0.08)*(0.85+Math.random()*0.3),
     wobble: Math.random()*Math.PI*2, hitFlash:0, animFrame:0, animTimer:0,
   })
 }
