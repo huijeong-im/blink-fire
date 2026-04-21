@@ -1113,27 +1113,15 @@ function renderLbPreview() {
 function showScoreOverlay() {
   document.getElementById('finalScore').textContent = score
   document.getElementById('finalWave').textContent  = wave
+  nickForm.classList.remove('hidden')
+  doneMsg.classList.add('hidden')
+  // 이전 닉네임 자동 채워두기 (변경 가능)
+  nickInput.value = localStorage.getItem('blinkfire_nick') || ''
+  submitBtn.textContent = 'SUBMIT SCORE'
+  submitBtn.disabled = false
   renderLbPreview()
   scoreOverlay.classList.remove('hidden')
-
-  const savedNick = localStorage.getItem('blinkfire_nick')
-  if (savedNick) {
-    // 저장된 닉네임 있으면 자동 제출
-    playerNick = savedNick
-    nickForm.classList.add('hidden')
-    doneMsg.classList.add('hidden')
-    submitScore(savedNick, score).then(() => fetchLeaderboard()).then(lb => {
-      leaderboard = lb
-      showDone(`✅ ${savedNick} 으로 등록됐어요!`)
-    })
-  } else {
-    nickForm.classList.remove('hidden')
-    doneMsg.classList.add('hidden')
-    nickInput.value = ''
-    submitBtn.textContent = 'SUBMIT SCORE'
-    submitBtn.disabled = false
-    setTimeout(() => nickInput.focus(), 100)
-  }
+  setTimeout(() => nickInput.focus(), 100)
 }
 
 function hideScoreOverlay() {
