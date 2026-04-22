@@ -185,6 +185,9 @@
       box-shadow: 0 0 8px rgba(0,255,136,0.3);
       transition: color .1s, border-color .1s, box-shadow .1s;
     }
+    @media (max-width: 600px) {
+      #muteBtn { bottom: auto; top: 14px; left: auto; right: 14px; font-size: 9px; padding: 4px 8px; }
+    }
     #muteBtn:hover { color: var(--yellow); border-color: var(--yellow); box-shadow: 0 0 8px rgba(255,235,59,0.4); }
     #muteBtn.muted { color: #444; border-color: #333; box-shadow: none; }
 
