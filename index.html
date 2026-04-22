@@ -281,6 +281,7 @@ async function fetchLeaderboard() {
 const canvas  = document.getElementById('gameCanvas')
 const ctx     = canvas.getContext('2d')
 const video   = document.getElementById('video')
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1
 const camCv   = document.getElementById('camCanvas')
 const camCtx  = camCv.getContext('2d')
 const loading = document.getElementById('loading')
@@ -985,10 +986,9 @@ function drawStartScreen() {
   drawText(title, cx-textW(title,ts)/2,   cy-180,   '#ffeb3b', ts)
 
   // Instructions
-  const lines=[
-    {t:'MOVE YOUR HEAD TO AIM', c:'#666', s:2},
-    {t:'BLINK TO SHOOT',        c:'#666', s:2},
-  ]
+  const lines = isMobile
+    ? [{t:'DRAG TO AIM', c:'#666', s:2}, {t:'TAP TO SHOOT', c:'#666', s:2}]
+    : [{t:'MOVE YOUR HEAD TO AIM', c:'#666', s:2}, {t:'BLINK TO SHOOT', c:'#666', s:2}]
   lines.forEach((l,i)=>{ drawText(l.t, cx-textW(l.t,l.s)/2, cy-110+i*22, l.c, l.s) })
 
   // Sprites
@@ -996,14 +996,14 @@ function drawStartScreen() {
   drawSprite('bat',      cx-12, cy-54)
   drawSprite('skeleton', cx+44, cy-58)
 
-  // BLINK LONG TO START
-  const st='BLINK LONG TO START', ss=3
+  // START 안내
+  const st = isMobile ? 'TAP TO START' : 'BLINK LONG TO START', ss=3
   ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
   drawText(st, cx-textW(st,ss)/2, cy-10, '#00ff88', ss)
   ctx.globalAlpha=1
 
-  // 2P 감지 표시
-  if (face2Visible) {
+  // 2P 감지 표시 (데스크탑만)
+  if (!isMobile && face2Visible) {
     const p2t='2P DETECTED!', p2s=2
     ctx.globalAlpha=0.7+0.3*Math.sin(Date.now()/300)
     drawText(p2t, cx-textW(p2t,p2s)/2, cy+18, '#00e5ff', p2s)
@@ -1152,7 +1152,9 @@ submitBtn.addEventListener('click', doSubmit)
 nickInput.addEventListener('keydown', e => { if (e.key==='Enter') doSubmit() })
 retryBtn.addEventListener('click', () => { hideScoreOverlay(); startGame() })
 
+// ─── INPUT: 데스크탑 마우스 ───────────────────────────────────────────────────
 canvas.addEventListener('click', e => {
+  if (isMobile) return
   if (scoreOverlay.classList.contains('hidden') && !faceVisible) {
     if (state==='playing') tryShoot(e.clientX, e.clientY)
     else if (state==='start') startGame()
@@ -1160,19 +1162,42 @@ canvas.addEventListener('click', e => {
   }
 })
 canvas.addEventListener('mousemove', e => {
+  if (isMobile) return
   if (!faceVisible) { crosshair.x=e.clientX; crosshair.y=e.clientY; crosshair.visible=true }
 })
-canvas.addEventListener('mouseleave', () => { if(!faceVisible) crosshair.visible=false })
-// 터치 이벤트 (모바일)
-canvas.addEventListener('touchstart', e => {
-  e.preventDefault()
-  const t = e.touches[0]
-  if (!faceVisible) {
-    if (state==='playing') tryShoot(t.clientX, t.clientY)
-    else if (state==='start') startGame()
-    else if (state==='gameover') startGame()
-  }
-}, { passive:false })
+canvas.addEventListener('mouseleave', () => { if(!isMobile && !faceVisible) crosshair.visible=false })
+
+// ─── INPUT: 모바일 터치 ────────────────────────────────────────────────────────
+if (isMobile) {
+  let _touchStartX=0, _touchStartY=0, _touchStartTime=0
+
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault()
+    const t = e.touches[0]
+    _touchStartX = t.clientX; _touchStartY = t.clientY; _touchStartTime = Date.now()
+    crosshair.x = t.clientX; crosshair.y = t.clientY; crosshair.visible = true
+    if (state==='start' || state==='gameover') {
+      if (scoreOverlay.classList.contains('hidden')) startGame()
+    }
+  }, { passive:false })
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault()
+    const t = e.touches[0]
+    crosshair.x = t.clientX; crosshair.y = t.clientY
+  }, { passive:false })
+
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault()
+    if (state !== 'playing') return
+    const dur = Date.now() - _touchStartTime
+    const dx = e.changedTouches[0].clientX - _touchStartX
+    const dy = e.changedTouches[0].clientY - _touchStartY
+    const moved = Math.hypot(dx, dy)
+    // 탭(짧고 이동 적으면) → 발사
+    if (dur < 250 && moved < 18) tryShoot(crosshair.x, crosshair.y)
+  }, { passive:false })
+}
 
 // ─── MEDIAPIPE FACE MESH ──────────────────────────────────────────────────────
 function eyeAR(lm,top,bot,outer,inner) {
@@ -1294,7 +1319,14 @@ function startCamera() {
     })
 }
 
-startCamera()
+if (isMobile) {
+  // 모바일: 카메라 불필요, 리더보드만 로드 후 바로 게임 진입
+  document.getElementById('camCanvas').style.display = 'none'
+  fetchLeaderboard().then(lb => { leaderboard=lb; lbLoaded=true })
+  loading.classList.add('hidden')
+} else {
+  startCamera()
+}
 </script>
 </body>
 </html>
