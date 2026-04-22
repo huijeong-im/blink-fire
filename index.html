@@ -179,9 +179,9 @@
 
     #muteBtn {
       position: fixed; bottom: 14px; left: 14px; z-index: 20;
-      font-family: var(--px); font-size: 13px;
+      font-family: var(--px); font-size: 11px;
       background: #0a0a1a; border: 2px solid #00ff88; border-radius: 0;
-      color: #00ff88; cursor: pointer; padding: 6px 12px; letter-spacing: 1px;
+      color: #00ff88; cursor: pointer; padding: 5px 10px; letter-spacing: 1px;
       box-shadow: 0 0 8px rgba(0,255,136,0.3);
       transition: color .1s, border-color .1s, box-shadow .1s;
     }
@@ -858,12 +858,23 @@ function hexToRgb(hex) {
 
 function drawHUD() {
   const pad=14, sz=3
-  drawText(`SCORE:${score}`, pad, pad, '#fff', sz)
-  const wt=`WAVE ${wave}`
-  drawText(wt, canvas.width/2-textW(wt,sz)/2, pad, '#ffeb3b', sz)
-  for (let i=0;i<5;i++) {
-    const hx=canvas.width-pad-(5-i)*(SP.heart.w*SC+6)
-    drawSprite('heart',hx,pad,0,i<lives?null:'#1a1a2e')
+  if (isMobile) {
+    // 모바일: SCORE 왼쪽, WAVE 왼쪽 두 번째 줄, 하트 오른쪽
+    drawText(`SCORE:${score}`, pad, pad, '#fff', sz)
+    const wt=`WAVE ${wave}`
+    drawText(wt, pad, pad+sz*7+4, '#ffeb3b', sz)
+    for (let i=0;i<5;i++) {
+      const hx=canvas.width-pad-(5-i)*(SP.heart.w*SC+6)
+      drawSprite('heart',hx,pad,0,i<lives?null:'#1a1a2e')
+    }
+  } else {
+    drawText(`SCORE:${score}`, pad, pad, '#fff', sz)
+    const wt=`WAVE ${wave}`
+    drawText(wt, canvas.width/2-textW(wt,sz)/2, pad, '#ffeb3b', sz)
+    for (let i=0;i<5;i++) {
+      const hx=canvas.width-pad-(5-i)*(SP.heart.w*SC+6)
+      drawSprite('heart',hx,pad,0,i<lives?null:'#1a1a2e')
+    }
   }
   // 활성 아이템 효과 표시
   const effects = []
@@ -906,10 +917,12 @@ function drawCrosshair(ch, power, p2=false) {
   ctx.fillRect(x-size-gap,y-1,size,2); ctx.fillRect(x+gap+1,y-1,size,2)
   ctx.fillRect(x-1,y-size-gap,2,size); ctx.fillRect(x-1,y+gap+1,2,size)
   ctx.fillRect(x-2,y-2,4,4)
-  // 플레이어 라벨
-  const label = p2 ? 'P2' : 'P1'
-  ctx.font = '700 9px "Courier New"'; ctx.textAlign='center'
-  ctx.fillStyle = color; ctx.fillText(label, x, y-size-gap-4)
+  // 플레이어 라벨 (데스크탑 2P일 때만)
+  if (!isMobile) {
+    const label = p2 ? 'P2' : 'P1'
+    ctx.font = '700 9px "Courier New"'; ctx.textAlign='center'
+    ctx.fillStyle = color; ctx.fillText(label, x, y-size-gap-4)
+  }
   if (strong) {
     ctx.globalAlpha=0.30; ctx.fillStyle=strongColor
     ctx.beginPath(); ctx.arc(x,y,40,0,Math.PI*2); ctx.fill()
@@ -1069,7 +1082,7 @@ function draw() {
   for (let y=0;y<canvas.height;y+=4) { ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(0,y,canvas.width,2) }
   if (crosshair.visible)  drawCrosshair(crosshair,  blinkPower,  false)
   if (crosshair2.visible) drawCrosshair(crosshair2, blinkPower2, true)
-  if (!faceVisible && !face2Visible && (state==='playing'||state==='waveclear')) {
+  if (!isMobile && !faceVisible && !face2Visible && (state==='playing'||state==='waveclear')) {
     const hint='SHOW YOUR FACE', sz=2
     ctx.globalAlpha=0.4+0.4*Math.sin(Date.now()/500)
     drawText(hint,canvas.width/2-textW(hint,sz)/2,canvas.height-52,'#888',sz)
