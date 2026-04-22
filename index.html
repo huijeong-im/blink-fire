@@ -866,13 +866,13 @@ function hexToRgb(hex) {
 function drawHUD() {
   const pad=14, sz=3
   if (isMobile) {
-    // 모바일: SCORE 왼쪽, WAVE 왼쪽 두 번째 줄, 하트 오른쪽
+    // 모바일: SCORE, WAVE, 하트 모두 왼쪽 (우상단은 SOUND 버튼 전용)
     drawText(`SCORE:${score}`, pad, pad, '#fff', sz)
     const wt=`WAVE ${wave}`
     drawText(wt, pad, pad+sz*7+4, '#ffeb3b', sz)
     for (let i=0;i<5;i++) {
-      const hx=canvas.width-pad-(5-i)*(SP.heart.w*SC+6)
-      drawSprite('heart',hx,pad,0,i<lives?null:'#1a1a2e')
+      const hx=pad+i*(SP.heart.w*SC+4)
+      drawSprite('heart',hx,pad+sz*14+6,0,i<lives?null:'#1a1a2e')
     }
   } else {
     drawText(`SCORE:${score}`, pad, pad, '#fff', sz)
