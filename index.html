@@ -562,6 +562,7 @@ let waveSize      = 6
 let spawnGap      = 1.8
 let gameStartCooldown = 0
 let gameOverCooldown  = 0   // 게임오버 직후 깜빡임 차단
+let _scoreOverlayTimer = null  // setTimeout 핸들 (취소용)
 let paused            = false
 
 const ETYPES = ['slime','bat','skeleton']
@@ -696,6 +697,9 @@ function collectItem(item) {
 
 // ─── GAME LOGIC ──────────────────────────────────────────────────────────────
 function startGame() {
+  // 이전 게임의 scoreOverlay 타이머 취소
+  if (_scoreOverlayTimer) { clearTimeout(_scoreOverlayTimer); _scoreOverlayTimer = null }
+  hideScoreOverlay()
   SFX.gameStart()
   BGM.start()
   playerNick = localStorage.getItem('blinkfire_nick') || ''
@@ -721,7 +725,7 @@ function loseLife() {
     gameOverCooldown = 3.0   // 3초간 깜빡임 차단
     fetchLeaderboard().then(lb => {
       leaderboard=lb
-      setTimeout(showScoreOverlay, 3000)   // 3초 후 닉네임 화면 표시
+      _scoreOverlayTimer = setTimeout(showScoreOverlay, 3000)   // 3초 후 닉네임 화면 표시
     })
   } else {
     SFX.loseLife()
@@ -1129,7 +1133,7 @@ function showScoreOverlay() {
   nickForm.classList.remove('hidden')
   doneMsg.classList.add('hidden')
   // 이전 닉네임 자동 채워두기 (변경 가능)
-  nickInput.value = localStorage.getItem('blinkfire_nick') || ''
+  nickInput.value = ''
   submitBtn.textContent = 'SUBMIT SCORE'
   submitBtn.disabled = false
   renderLbPreview()
@@ -1189,7 +1193,7 @@ if (isMobile) {
     const t = e.touches[0]
     _touchStartX = t.clientX; _touchStartY = t.clientY; _touchStartTime = Date.now()
     crosshair.x = t.clientX; crosshair.y = t.clientY; crosshair.visible = true
-    if (state==='start' || state==='gameover') {
+    if ((state==='start' || state==='gameover') && gameOverCooldown <= 0) {
       if (scoreOverlay.classList.contains('hidden')) startGame()
     }
   }, { passive:false })
