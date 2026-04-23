@@ -555,278 +555,257 @@ muteBtn.addEventListener('click', toggleMute)
 window.addEventListener('keydown', e => { if (e.key==='m'||e.key==='M') toggleMute() })
 
 // ─── GAME STATE ──────────────────────────────────────────────────────────────
-let playerNick    = ''   // 게임오버 후 입력, 매 게임마다 초기화
 let leaderboard   = []
 let lbLoaded      = false
-let scoreSubmitted = false
+let _scoreOverlayTimer = null
 
-let state         = 'start'
-let score         = 0
-let lives         = 3
-let wave          = 1
-let enemies       = []
-let particles     = []
-let flashes       = []
-let scorePopups   = []
-let muzzleFlashes = []
-let bulletTrails  = []
-let shockwaves    = []
-let shakeAmount   = 0, shakeX = 0, shakeY = 0
-let crosshair     = { x:-200, y:-200, visible:false }
-let crosshair2    = { x:-200, y:-200, visible:false }
-let faceVisible   = false
-let face2Visible  = false
-let isBlinking    = false
-let blinkPower    = 0    // 0=none 1=weak(윙크) 2=strong(양쪽)
-let blinkStart    = 0
-let blinkType     = 0    // 발사 타입 기록용
-let blinkPower2   = 0
-let blinkStart2   = 0
-let blinkType2    = 0
-let canShoot      = true
-let flashScreen   = 0
-let items         = []
-let rapidTimer    = 0   // 연사 지속 시간
-let slowTimer     = 0   // 슬로우 지속 시간
-let doubleTimer   = 0   // 2배 점수 지속 시간
-let itemFlash     = {color:'#fff', alpha:0}  // 아이템 획득 화면 효과
-let comboCount    = 0
-let comboTimer    = 0
+let gameMode        = '1p'   // '1p' or '2p'
+let twoPlayerWinner = 0      // 0=none 1=P1wins 2=P2wins 3=draw
+
+function createGameState() {
+  return {
+    state:'start', score:0, lives:3, wave:1,
+    enemies:[], particles:[], flashes:[], scorePopups:[],
+    muzzleFlashes:[], bulletTrails:[], shockwaves:[], items:[],
+    spawned:0, spawnTimer:0, waveDelay:0, waveSize:5, spawnGap:2.14,
+    comboCount:0, comboTimer:0,
+    rapidTimer:0, slowTimer:0, doubleTimer:0, itemFlash:{color:'#fff',alpha:0},
+    canShoot:true, shakeAmount:0, shakeX:0, shakeY:0,
+    flashScreen:0, gameStartCooldown:0, gameOverCooldown:0,
+    scoreSubmitted:false, playerNick:'',
+    crosshair:{x:-200,y:-200,visible:false},
+    blinkPower:0, blinkStart:0, blinkType:0, faceVisible:false,
+  }
+}
+
+let g1 = createGameState()
+let g2 = createGameState()
+
 const COMBO_WINDOW = 2.2
-let waveDelay     = 0
-let spawnTimer    = 0
-let spawned       = 0
-let waveSize      = 6
-let spawnGap      = 1.8
-let gameStartCooldown = 0
-let gameOverCooldown  = 0   // 게임오버 직후 깜빡임 차단
-let _scoreOverlayTimer = null  // setTimeout 핸들 (취소용)
-let paused            = false
-
 const ETYPES = ['slime','bat','skeleton']
 const EHP    = { slime:1, bat:1, skeleton:3 }
 const ESCORE = { slime:10, bat:15, skeleton:30 }
 const ESPEED = { slime:58, bat:100, skeleton:42 }
 const ECOLOR = { slime:'#4caf50', bat:'#9c27b0', skeleton:'#eceff1' }
 
-function waveConfig(w) {
-  waveSize = 4 + w; spawnGap = Math.max(1.0, 2.2 - w*0.08)
-}
-function spawnEnemy() {
-  const type = ETYPES[Math.floor(Math.random()*ETYPES.length)]
-  const margin = 60
-  enemies.push({
-    type, x: canvas.width+30, y: margin+Math.random()*(canvas.height-margin*2),
-    hp: EHP[type]+Math.floor(wave/4), maxHp: EHP[type]+Math.floor(wave/4),
-    speed: ESPEED[type]*(1+wave*0.08)*(0.85+Math.random()*0.3),
-    wobble: Math.random()*Math.PI*2, hitFlash:0, animFrame:0, animTimer:0,
-  })
-}
-function spawnParticles(x, y, color, count=14) {
+function spawnParticles(g, x, y, color, count=14) {
   for (let i=0; i<count; i++) {
     const a = Math.random()*Math.PI*2, spd = 60+Math.random()*140
-    particles.push({x,y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd,
+    g.particles.push({x,y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd,
       life:1, decay:1.2+Math.random()*1.2, sz:2+Math.random()*4, color})
   }
 }
 
 // ─── SHOOT ───────────────────────────────────────────────────────────────────
-// power: 1=약한샷(윙크), 2=강한샷(양쪽눈)
-function tryShoot(x, y, power = 1) {
-  if (!canShoot || state !== 'playing' || paused) return
-  canShoot = false
-
-  const isStrong   = power >= 2
-  const damage     = isStrong ? 2 : 1
-  const flashSize  = isStrong ? 100 : 48
+// power: 1=약한샷(윙크), 2=강한샷(양쪽눈)  g=게임 인스턴스
+function tryShoot(g, x, y, power=1) {
+  if (!g.canShoot || g.state !== 'playing') return
+  g.canShoot = false
+  const isStrong = power >= 2
+  const damage = isStrong ? 2 : 1
+  const flashSize = isStrong ? 100 : 48
   const flashColor = isStrong ? '#ff8c00' : '#ffe57f'
-  flashScreen      = isStrong ? 0.55 : 0.22
-
+  g.flashScreen = isStrong ? 0.55 : 0.22
   if (isStrong) SFX.shootStrong(); else SFX.shootWeak()
-  muzzleFlashes.push({x, y, life:1, size:flashSize, strong:isStrong})
-  if (isStrong) {
-    muzzleFlashes.push({x, y, life:0.7, size:flashSize*1.4, strong:true})
-  }
-
+  g.muzzleFlashes.push({x, y, life:1, size:flashSize, strong:isStrong})
+  if (isStrong) g.muzzleFlashes.push({x, y, life:0.7, size:flashSize*1.4, strong:true})
   let hit=false, hitX=0, hitY=y
-  for (let i=enemies.length-1; i>=0; i--) {
-    const e=enemies[i], sw=SP[e.type].w*SC, sh=SP[e.type].h*SC
+  for (let i=g.enemies.length-1; i>=0; i--) {
+    const e=g.enemies[i], sw=SP[e.type].w*SC, sh=SP[e.type].h*SC
     const ex=e.x-sw/2, ey=e.y-sh/2
     if (x>=ex-8 && x<=ex+sw+8 && y>=ey-8 && y<=ey+sh+8) {
       e.hp -= damage; e.hitFlash=0.4; hitX=e.x; hitY=e.y
       if (e.hp<=0) {
-        const combo = comboCount >= 2 ? comboCount : 1
-        const pts   = ESCORE[e.type] * wave * combo * (doubleTimer>0 ? 2 : 1)
-        score += pts
-        comboCount++; comboTimer = COMBO_WINDOW
-        if (comboCount >= 3) SFX.combo(Math.min(comboCount, 8)); else SFX.kill()
-        if (Math.random() < ITEM_DROP_CHANCE) spawnItem(e.x, e.y)
-        spawnParticles(e.x, e.y, ECOLOR[e.type], isStrong ? 32 : 18)
-        shockwaves.push({x:e.x,y:e.y,r:0,life:1,     color:ECOLOR[e.type]})
-        shockwaves.push({x:e.x,y:e.y,r:0,life:0.7,   color:'#fff'})
-        if (isStrong) shockwaves.push({x:e.x,y:e.y,r:0,life:0.5,color:flashColor})
+        const combo = g.comboCount >= 2 ? g.comboCount : 1
+        const pts = ESCORE[e.type] * g.wave * combo * (g.doubleTimer>0 ? 2 : 1)
+        g.score += pts; g.comboCount++; g.comboTimer = COMBO_WINDOW
+        if (g.comboCount >= 3) SFX.combo(Math.min(g.comboCount, 8)); else SFX.kill()
+        if (Math.random() < ITEM_DROP_CHANCE) spawnItem(g, e.x, e.y)
+        spawnParticles(g, e.x, e.y, ECOLOR[e.type], isStrong ? 32 : 18)
+        g.shockwaves.push({x:e.x,y:e.y,r:0,life:1,color:ECOLOR[e.type]})
+        g.shockwaves.push({x:e.x,y:e.y,r:0,life:0.7,color:'#fff'})
+        if (isStrong) g.shockwaves.push({x:e.x,y:e.y,r:0,life:0.5,color:flashColor})
         const label = combo>=2 ? `+${pts} x${combo}!` : `+${pts}`
-        scorePopups.push({x:e.x,y:e.y-10,text:label,life:1,combo:combo>=2})
-        enemies.splice(i,1); shakeAmount = isStrong ? 14 : 7
-      } else { shakeAmount = isStrong ? 7 : 4; SFX.hit() }
+        g.scorePopups.push({x:e.x,y:e.y-10,text:label,life:1,combo:combo>=2})
+        g.enemies.splice(i,1); g.shakeAmount = isStrong ? 14 : 7
+      } else { g.shakeAmount = isStrong ? 7 : 4; SFX.hit() }
       hit=true; break
     }
   }
-  // 아이템 충돌 감지
   if (!hit) {
-    for (let i=items.length-1; i>=0; i--) {
-      const it=items[i], r=28
-      if (Math.hypot(x-it.x, y-it.y) < r) {
-        collectItem(it); items.splice(i,1); hit=true; break
-      }
+    for (let i=g.items.length-1; i>=0; i--) {
+      const it=g.items[i]
+      if (Math.hypot(x-it.x, y-it.y) < 28) { collectItem(g, it); g.items.splice(i,1); hit=true; break }
     }
   }
-  bulletTrails.push({x1:x,y1:y,x2:hit?hitX:0,y2:hitY,life:1,strong:isStrong})
-  if (!hit) { shakeAmount=isStrong?4:2 }
-  setTimeout(() => { canShoot=true }, rapidTimer>0 ? 80 : isStrong ? 400 : 250)
+  g.bulletTrails.push({x1:x,y1:y,x2:hit?hitX:0,y2:hitY,life:1,strong:isStrong})
+  if (!hit) g.shakeAmount = isStrong ? 4 : 2
+  const _g = g
+  setTimeout(() => { _g.canShoot=true }, g.rapidTimer>0 ? 80 : isStrong ? 400 : 250)
 }
 
 window.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault() }
+  if (e.key==='1') gameMode='1p'
+  if (e.key==='2') gameMode='2p'
 })
 
 // ─── ITEM LOGIC ──────────────────────────────────────────────────────────────
 const ITEM_TYPES = ['heart','rapid','bomb','slow','double']
 const ITEM_DROP_CHANCE = 0.28
 
-function spawnItem(x, y) {
+function spawnItem(g, x, y) {
   const type = ITEM_TYPES[Math.floor(Math.random()*ITEM_TYPES.length)]
-  items.push({ type, x, y, speed: 55+Math.random()*25, wobble: Math.random()*Math.PI*2 })
+  g.items.push({ type, x, y, speed: 55+Math.random()*25, wobble: Math.random()*Math.PI*2 })
 }
 
-function collectItem(item) {
-  spawnParticles(item.x, item.y, ITEM_SP[item.type].c, 20)
-  shockwaves.push({x:item.x, y:item.y, r:0, life:1, color:ITEM_SP[item.type].c})
-  itemFlash = { color: ITEM_SP[item.type].c, alpha: 0.45 }
-
+function collectItem(g, item) {
+  spawnParticles(g, item.x, item.y, ITEM_SP[item.type].c, 20)
+  g.shockwaves.push({x:item.x, y:item.y, r:0, life:1, color:ITEM_SP[item.type].c})
+  g.itemFlash = { color: ITEM_SP[item.type].c, alpha: 0.45 }
   if (item.type === 'heart') {
-    SFX.itemHeart(); lives = Math.min(lives+1, 5)
-    scorePopups.push({x:item.x, y:item.y-10, text:'♥ +1 LIFE!', life:1, combo:true})
+    SFX.itemHeart(); g.lives = Math.min(g.lives+1, 5)
+    g.scorePopups.push({x:item.x, y:item.y-10, text:'♥ +1 LIFE!', life:1, combo:true})
   } else if (item.type === 'rapid') {
-    SFX.itemRapid(); rapidTimer = 5
-    scorePopups.push({x:item.x, y:item.y-10, text:'RAPID FIRE!', life:1, combo:true})
+    SFX.itemRapid(); g.rapidTimer = 5
+    g.scorePopups.push({x:item.x, y:item.y-10, text:'RAPID FIRE!', life:1, combo:true})
   } else if (item.type === 'bomb') {
     SFX.itemBomb()
-    scorePopups.push({x:item.x, y:item.y-10, text:'BOOM!!', life:1, combo:true})
-    shakeAmount = 20; flashScreen = 0.8
-    // 모든 적 폭발
-    for (const e of enemies) {
-      const combo = comboCount >= 2 ? comboCount : 1
-      score += ESCORE[e.type] * wave * (doubleTimer>0?2:1) * combo
-      spawnParticles(e.x, e.y, ECOLOR[e.type], 24)
-      shockwaves.push({x:e.x, y:e.y, r:0, life:1, color:ECOLOR[e.type]})
-      shockwaves.push({x:e.x, y:e.y, r:0, life:0.6, color:'#fff'})
-      comboCount++; comboTimer = COMBO_WINDOW
+    g.scorePopups.push({x:item.x, y:item.y-10, text:'BOOM!!', life:1, combo:true})
+    g.shakeAmount = 20; g.flashScreen = 0.8
+    for (const e of g.enemies) {
+      const combo = g.comboCount >= 2 ? g.comboCount : 1
+      g.score += ESCORE[e.type] * g.wave * (g.doubleTimer>0?2:1) * combo
+      spawnParticles(g, e.x, e.y, ECOLOR[e.type], 24)
+      g.shockwaves.push({x:e.x, y:e.y, r:0, life:1, color:ECOLOR[e.type]})
+      g.shockwaves.push({x:e.x, y:e.y, r:0, life:0.6, color:'#fff'})
+      g.comboCount++; g.comboTimer = COMBO_WINDOW
     }
-    enemies = []
+    g.enemies = []
   } else if (item.type === 'slow') {
-    SFX.itemSlow(); slowTimer = 5
-    scorePopups.push({x:item.x, y:item.y-10, text:'TIME SLOW!', life:1, combo:true})
+    SFX.itemSlow(); g.slowTimer = 5
+    g.scorePopups.push({x:item.x, y:item.y-10, text:'TIME SLOW!', life:1, combo:true})
   } else if (item.type === 'double') {
-    SFX.itemDouble(); doubleTimer = 5
-    scorePopups.push({x:item.x, y:item.y-10, text:'SCORE x2!', life:1, combo:true})
+    SFX.itemDouble(); g.doubleTimer = 5
+    g.scorePopups.push({x:item.x, y:item.y-10, text:'SCORE x2!', life:1, combo:true})
   }
 }
 
 // ─── GAME LOGIC ──────────────────────────────────────────────────────────────
+function initGame(g) {
+  g.score=0; g.lives=3; g.wave=1
+  g.enemies=[]; g.particles=[]; g.flashes=[]; g.scorePopups=[]
+  g.muzzleFlashes=[]; g.bulletTrails=[]; g.shockwaves=[]; g.items=[]
+  g.spawned=0; g.spawnTimer=0; g.waveDelay=0
+  g.comboCount=0; g.comboTimer=0
+  g.rapidTimer=0; g.slowTimer=0; g.doubleTimer=0; g.itemFlash={color:'#fff',alpha:0}
+  g.waveSize=5; g.spawnGap=2.14
+  g.gameStartCooldown=1.5; g.scoreSubmitted=false; g.state='playing'
+  g.gameOverCooldown=0; g.flashScreen=0; g.shakeAmount=0
+}
+
 function startGame() {
-  // 이전 게임의 scoreOverlay 타이머 취소
   if (_scoreOverlayTimer) { clearTimeout(_scoreOverlayTimer); _scoreOverlayTimer = null }
   hideScoreOverlay()
-  SFX.gameStart()
-  BGM.start()
-  playerNick = localStorage.getItem('blinkfire_nick') || ''
-  score=0; lives=3; wave=1
-  enemies=[]; particles=[]; flashes=[]; scorePopups=[]
-  muzzleFlashes=[]; bulletTrails=[]; shockwaves=[]; items=[]
-  spawned=0; spawnTimer=0; waveDelay=0
-  comboCount=0; comboTimer=0
-  rapidTimer=0; slowTimer=0; doubleTimer=0; itemFlash={color:'#fff',alpha:0}
-  waveConfig(wave); gameStartCooldown=1.5
-  scoreSubmitted=false; state='playing'
+  SFX.gameStart(); BGM.start()
+  twoPlayerWinner = 0
+  initGame(g1)
+  if (gameMode==='2p') initGame(g2)
 }
-function nextWave() {
-  SFX.waveClear()
-  wave++; waveConfig(wave); spawned=0; spawnTimer=0; waveDelay=3; state='waveclear'
-}
-function loseLife() {
-  lives--; flashScreen=0.5
-  if (lives<=0) {
-    SFX.gameOver()
-    BGM.stop()
-    state='gameover'
-    gameOverCooldown = 3.0   // 3초간 깜빡임 차단
-    fetchLeaderboard().then(lb => {
-      leaderboard=lb
-      _scoreOverlayTimer = setTimeout(showScoreOverlay, 3000)   // 3초 후 닉네임 화면 표시
-    })
-  } else {
-    SFX.loseLife()
-  }
+
+function loseLife(g) {
+  g.lives--; g.flashScreen=0.5
+  if (g.lives<=0) {
+    g.state='gameover'; g.gameOverCooldown=3.0
+    if (gameMode==='2p') {
+      BGM.stop(); SFX.gameOver()
+      const other = g===g1 ? g2 : g1
+      if (other.state==='gameover') {
+        twoPlayerWinner = g1.score > g2.score ? 1 : g2.score > g1.score ? 2 : 3
+      } else {
+        twoPlayerWinner = g===g1 ? 2 : 1
+      }
+    } else {
+      SFX.gameOver(); BGM.stop()
+      fetchLeaderboard().then(lb => {
+        leaderboard=lb
+        _scoreOverlayTimer = setTimeout(showScoreOverlay, 3000)
+      })
+    }
+  } else { SFX.loseLife() }
 }
 
 // ─── UPDATE ──────────────────────────────────────────────────────────────────
-function update(dt) {
-  if (paused) return
-  frameTime += dt
-  gameStartCooldown = Math.max(0, gameStartCooldown-dt)
-  gameOverCooldown  = Math.max(0, gameOverCooldown-dt)
-  updateStars(dt)
-  if (state==='playing') {
-    spawnTimer -= dt
-    if (spawnTimer<=0 && spawned<waveSize) { spawnEnemy(); spawned++; spawnTimer=spawnGap }
-    for (let i=enemies.length-1; i>=0; i--) {
-      const e=enemies[i]
-      e.wobble += dt*(e.type==='bat'?5:2.5); e.x-=e.speed*(slowTimer>0?0.3:1)*dt
+function updateGame(g, dt, gw) {
+  g.gameStartCooldown = Math.max(0, g.gameStartCooldown-dt)
+  g.gameOverCooldown  = Math.max(0, g.gameOverCooldown-dt)
+  if (g.state==='playing') {
+    g.spawnTimer -= dt
+    if (g.spawnTimer<=0 && g.spawned<g.waveSize) {
+      const type = ETYPES[Math.floor(Math.random()*ETYPES.length)]
+      const margin = 60
+      g.enemies.push({
+        type, x: gw+30, y: margin+Math.random()*(canvas.height-margin*2),
+        hp: EHP[type]+Math.floor(g.wave/4), maxHp: EHP[type]+Math.floor(g.wave/4),
+        speed: ESPEED[type]*(1+g.wave*0.08)*(0.85+Math.random()*0.3),
+        wobble: Math.random()*Math.PI*2, hitFlash:0, animFrame:0, animTimer:0,
+      })
+      g.spawned++; g.spawnTimer=g.spawnGap
+    }
+    for (let i=g.enemies.length-1; i>=0; i--) {
+      const e=g.enemies[i]
+      e.wobble += dt*(e.type==='bat'?5:2.5); e.x-=e.speed*(g.slowTimer>0?0.3:1)*dt
       e.hitFlash=Math.max(0,e.hitFlash-dt*4)
       e.animTimer+=dt; if(e.animTimer>0.4){e.animTimer=0;e.animFrame++}
-      if (e.x<-60) { enemies.splice(i,1); loseLife() }
+      if (e.x<-60) { g.enemies.splice(i,1); loseLife(g) }
     }
-    if (spawned>=waveSize && enemies.length===0) nextWave()
+    if (g.spawned>=g.waveSize && g.enemies.length===0) {
+      SFX.waveClear()
+      g.wave++; g.waveSize=4+g.wave; g.spawnGap=Math.max(1.0,2.2-g.wave*0.08)
+      g.spawned=0; g.spawnTimer=0; g.waveDelay=3; g.state='waveclear'
+    }
   }
-  if (state==='waveclear') { waveDelay-=dt; if(waveDelay<=0) state='playing' }
-  for (let i=particles.length-1;i>=0;i--) {
-    const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=180*dt; p.life-=p.decay*dt
-    if(p.life<=0) particles.splice(i,1)
+  if (g.state==='waveclear') { g.waveDelay-=dt; if(g.waveDelay<=0) g.state='playing' }
+  for (let i=g.particles.length-1;i>=0;i--) {
+    const p=g.particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=180*dt; p.life-=p.decay*dt
+    if(p.life<=0) g.particles.splice(i,1)
   }
-  for (let i=flashes.length-1;i>=0;i--) {
-    const f=flashes[i]; f.r+=200*dt; f.a-=2.5*dt; if(f.a<=0) flashes.splice(i,1)
+  for (let i=g.flashes.length-1;i>=0;i--) {
+    const f=g.flashes[i]; f.r+=200*dt; f.a-=2.5*dt; if(f.a<=0) g.flashes.splice(i,1)
   }
-  for (let i=scorePopups.length-1;i>=0;i--) {
-    const p=scorePopups[i]; p.y-=40*dt; p.life-=2*dt; if(p.life<=0) scorePopups.splice(i,1)
+  for (let i=g.scorePopups.length-1;i>=0;i--) {
+    const p=g.scorePopups[i]; p.y-=40*dt; p.life-=2*dt; if(p.life<=0) g.scorePopups.splice(i,1)
   }
-  flashScreen=Math.max(0,flashScreen-dt*4)
-  shakeAmount=Math.max(0,shakeAmount-dt*40)
-  if (comboCount>0) { comboTimer-=dt; if(comboTimer<=0) comboCount=0 }
-  rapidTimer  = Math.max(0, rapidTimer-dt)
-  slowTimer   = Math.max(0, slowTimer-dt)
-  doubleTimer = Math.max(0, doubleTimer-dt)
-  itemFlash.alpha = Math.max(0, itemFlash.alpha - dt*2)
-  // 아이템 이동
-  for (let i=items.length-1; i>=0; i--) {
-    const it=items[i]
-    it.x -= it.speed * (slowTimer>0 ? 0.4 : 1) * dt
-    it.wobble += dt * 2.5
-    if (it.x < -60) items.splice(i,1)
+  g.flashScreen=Math.max(0,g.flashScreen-dt*4)
+  g.shakeAmount=Math.max(0,g.shakeAmount-dt*40)
+  if (g.comboCount>0) { g.comboTimer-=dt; if(g.comboTimer<=0) g.comboCount=0 }
+  g.rapidTimer=Math.max(0,g.rapidTimer-dt); g.slowTimer=Math.max(0,g.slowTimer-dt); g.doubleTimer=Math.max(0,g.doubleTimer-dt)
+  g.itemFlash.alpha = Math.max(0, g.itemFlash.alpha-dt*2)
+  for (let i=g.items.length-1; i>=0; i--) {
+    const it=g.items[i]
+    it.x -= it.speed*(g.slowTimer>0?0.4:1)*dt; it.wobble+=dt*2.5
+    if (it.x<-60) g.items.splice(i,1)
   }
-  shakeX = shakeAmount>0.5?(Math.random()-0.5)*shakeAmount:0
-  shakeY = shakeAmount>0.5?(Math.random()-0.5)*shakeAmount:0
-  for (let i=muzzleFlashes.length-1;i>=0;i--) { muzzleFlashes[i].life-=dt*5; if(muzzleFlashes[i].life<=0) muzzleFlashes.splice(i,1) }
-  for (let i=bulletTrails.length-1;i>=0;i--) { bulletTrails[i].life-=dt*5;   if(bulletTrails[i].life<=0) bulletTrails.splice(i,1) }
-  for (let i=shockwaves.length-1;i>=0;i--) {
-    shockwaves[i].r+=280*dt; shockwaves[i].life-=dt*2.5; if(shockwaves[i].life<=0) shockwaves.splice(i,1)
+  g.shakeX=g.shakeAmount>0.5?(Math.random()-0.5)*g.shakeAmount:0
+  g.shakeY=g.shakeAmount>0.5?(Math.random()-0.5)*g.shakeAmount:0
+  for (let i=g.muzzleFlashes.length-1;i>=0;i--) { g.muzzleFlashes[i].life-=dt*5; if(g.muzzleFlashes[i].life<=0) g.muzzleFlashes.splice(i,1) }
+  for (let i=g.bulletTrails.length-1;i>=0;i--)  { g.bulletTrails[i].life-=dt*5;  if(g.bulletTrails[i].life<=0) g.bulletTrails.splice(i,1) }
+  for (let i=g.shockwaves.length-1;i>=0;i--) {
+    g.shockwaves[i].r+=280*dt; g.shockwaves[i].life-=dt*2.5; if(g.shockwaves[i].life<=0) g.shockwaves.splice(i,1)
   }
+}
+
+function update(dt) {
+  const gw = gameMode==='2p' ? canvas.width/2 : canvas.width
+  updateStars(dt)
+  if (twoPlayerWinner===0) updateGame(g1, dt, gw)
+  if (gameMode==='2p' && twoPlayerWinner===0) updateGame(g2, dt, gw)
 }
 let frameTime = 0
 
 // ─── DRAW EFFECTS ────────────────────────────────────────────────────────────
-function drawEnemies() {
-  for (const e of enemies) {
+function drawEnemies(g) {
+  for (const e of g.enemies) {
     const sw=SP[e.type].w*SC, sh=SP[e.type].h*SC
     const wy=e.type==='bat'?Math.sin(e.wobble)*8:Math.sin(e.wobble)*2
     const x=Math.floor(e.x-sw/2), y=Math.floor(e.y-sh/2+wy)
@@ -839,23 +818,23 @@ function drawEnemies() {
     }
   }
 }
-function drawParticles() {
-  for (const p of particles) { ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.color; ctx.fillRect(Math.floor(p.x),Math.floor(p.y),Math.ceil(p.sz),Math.ceil(p.sz)) }
+function drawParticles(g) {
+  for (const p of g.particles) { ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.color; ctx.fillRect(Math.floor(p.x),Math.floor(p.y),Math.ceil(p.sz),Math.ceil(p.sz)) }
   ctx.globalAlpha=1
 }
-function drawFlashes() {
-  for (const f of flashes) { ctx.globalAlpha=Math.max(0,f.a); ctx.strokeStyle=f.color; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,Math.PI*2); ctx.stroke() }
+function drawFlashes(g) {
+  for (const f of g.flashes) { ctx.globalAlpha=Math.max(0,f.a); ctx.strokeStyle=f.color; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,Math.PI*2); ctx.stroke() }
   ctx.globalAlpha=1
 }
-function drawScorePopups() {
-  for (const p of scorePopups) {
+function drawScorePopups(g) {
+  for (const p of g.scorePopups) {
     ctx.globalAlpha=Math.max(0,p.life)
     drawText(p.text,Math.floor(p.x),Math.floor(p.y),p.combo?'#ff9800':'#ffeb3b',p.combo?4:3)
   }
   ctx.globalAlpha=1
 }
-function drawMuzzleFlashes() {
-  for (const f of muzzleFlashes) {
+function drawMuzzleFlashes(g) {
+  for (const f of g.muzzleFlashes) {
     const a=Math.max(0,f.life), sz=f.size*(1.8-f.life*0.8)
     const grad=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,sz)
     grad.addColorStop(0,`rgba(255,255,255,${a})`); grad.addColorStop(0.25,`rgba(255,230,100,${a*0.9})`)
@@ -869,8 +848,8 @@ function drawMuzzleFlashes() {
   }
   ctx.globalAlpha=1
 }
-function drawBulletTrails() {
-  for (const t of bulletTrails) {
+function drawBulletTrails(g) {
+  for (const t of g.bulletTrails) {
     const a=Math.max(0,t.life)
     if (t.strong) {
       ctx.globalAlpha=a*0.6; ctx.strokeStyle='#ff8c00'; ctx.lineWidth=9*a; ctx.lineCap='round'
@@ -886,8 +865,8 @@ function drawBulletTrails() {
   }
   ctx.globalAlpha=1; ctx.lineCap='butt'
 }
-function drawShockwaves() {
-  for (const s of shockwaves) {
+function drawShockwaves(g) {
+  for (const s of g.shockwaves) {
     ctx.globalAlpha=Math.max(0,s.life*0.7); ctx.strokeStyle=s.color; ctx.lineWidth=Math.max(1,4*s.life)
     ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.stroke()
   }
@@ -898,93 +877,66 @@ function hexToRgb(hex) {
   return `${r},${g},${b}`
 }
 
-function drawHUD() {
+function drawHUD(g, gw) {
   const pad=14, sz=3
-  if (isMobile) {
-    // 모바일: SCORE, WAVE, 하트 모두 왼쪽 (우상단은 SOUND 버튼 전용)
-    drawText(`SCORE:${score}`, pad, pad, '#fff', sz)
-    const wt=`WAVE ${wave}`
-    drawText(wt, pad, pad+sz*7+4, '#ffeb3b', sz)
-    for (let i=0;i<5;i++) {
-      const hx=pad+i*(SP.heart.w*SC+4)
-      drawSprite('heart',hx,pad+sz*14+6,0,i<lives?null:'#1a1a2e')
-    }
-  } else {
-    drawText(`SCORE:${score}`, pad, pad, '#fff', sz)
-    const wt=`WAVE ${wave}`
-    drawText(wt, canvas.width/2-textW(wt,sz)/2, pad, '#ffeb3b', sz)
-    for (let i=0;i<5;i++) {
-      const hx=canvas.width-pad-(5-i)*(SP.heart.w*SC+6)
-      drawSprite('heart',hx,pad,0,i<lives?null:'#1a1a2e')
-    }
+  drawText(`SCORE:${g.score}`, pad, pad, '#fff', sz)
+  const wt=`WAVE ${g.wave}`
+  drawText(wt, gw/2-textW(wt,sz)/2, pad, '#ffeb3b', sz)
+  for (let i=0;i<5;i++) {
+    const hx=gw-pad-(5-i)*(SP.heart.w*SC+6)
+    drawSprite('heart',hx,pad,0,i<g.lives?null:'#1a1a2e')
   }
-  // 활성 아이템 효과 표시
   const effects = []
-  if (rapidTimer>0)  effects.push({label:`RAPID ${rapidTimer.toFixed(1)}s`,  color:'#ffeb3b'})
-  if (slowTimer>0)   effects.push({label:`SLOW ${slowTimer.toFixed(1)}s`,    color:'#29b6f6'})
-  if (doubleTimer>0) effects.push({label:`x2 ${doubleTimer.toFixed(1)}s`,    color:'#69f0ae'})
+  if (g.rapidTimer>0)  effects.push({label:`RAPID ${g.rapidTimer.toFixed(1)}s`, color:'#ffeb3b'})
+  if (g.slowTimer>0)   effects.push({label:`SLOW ${g.slowTimer.toFixed(1)}s`,   color:'#29b6f6'})
+  if (g.doubleTimer>0) effects.push({label:`x2 ${g.doubleTimer.toFixed(1)}s`,   color:'#69f0ae'})
   effects.forEach((ef, i) => {
-    ctx.font = '700 10px "Courier New"'; ctx.textAlign = 'left'
-    ctx.fillStyle = ef.color
-    ctx.globalAlpha = 0.8 + 0.2*Math.sin(Date.now()/200)
-    ctx.fillText(ef.label, pad, canvas.height - 56 - i*20)
-    ctx.globalAlpha = 1
+    ctx.font='700 10px "Courier New"'; ctx.textAlign='left'; ctx.fillStyle=ef.color
+    ctx.globalAlpha=0.8+0.2*Math.sin(Date.now()/200)
+    ctx.fillText(ef.label, pad, canvas.height-56-i*20); ctx.globalAlpha=1
   })
-  // 콤보 표시
-  if (comboCount>=2) {
-    const ct=`x${comboCount} COMBO!`, cs=3
+  if (g.comboCount>=2) {
+    const ct=`x${g.comboCount} COMBO!`, cs=3
     const pulse=0.7+0.3*Math.sin(Date.now()/120)
     ctx.globalAlpha=pulse
-    drawText(ct, canvas.width/2-textW(ct,cs)/2, canvas.height-52, '#ffeb3b', cs)
+    drawText(ct, gw/2-textW(ct,cs)/2, canvas.height-52, '#ffeb3b', cs)
     ctx.globalAlpha=1
-    // 콤보 타이머 바
-    const bw=120, bh=4
-    const bx=canvas.width/2-bw/2, by=canvas.height-28
+    const bw=120, bh=4, bx=gw/2-bw/2, by=canvas.height-28
     ctx.fillStyle='#222'; ctx.fillRect(bx,by,bw,bh)
-    const ratio=comboTimer/COMBO_WINDOW
-    const barColor=ratio>0.5?'#ffeb3b':ratio>0.25?'#ff9800':'#f44336'
-    ctx.fillStyle=barColor; ctx.fillRect(bx,by,Math.floor(bw*ratio),bh)
+    const ratio=g.comboTimer/COMBO_WINDOW
+    ctx.fillStyle=ratio>0.5?'#ffeb3b':ratio>0.25?'#ff9800':'#f44336'
+    ctx.fillRect(bx,by,Math.floor(bw*ratio),bh)
   }
 }
-function drawCrosshair(ch, power, p2=false) {
+function drawCrosshair(ch, power, startCd, p2=false) {
   const {x,y}=ch, size=38, gap=8
-  const strong = power>=2 && gameStartCooldown<=0
-  const weak   = power===1 && gameStartCooldown<=0
-  // P1: 초록/노랑/주황  P2: 하늘/분홍/빨강
-  const baseColor  = p2 ? '#00e5ff' : '#00ff88'
-  const weakColor  = p2 ? '#ff6ec7' : '#ffeb3b'
-  const strongColor= p2 ? '#ff1744' : '#ff8c00'
-  const color = strong ? strongColor : weak ? weakColor : baseColor
+  const strong=power>=2&&startCd<=0, weak=power===1&&startCd<=0
+  const baseColor=p2?'#00e5ff':'#00ff88', weakColor=p2?'#ff6ec7':'#ffeb3b', strongColor=p2?'#ff1744':'#ff8c00'
+  const color=strong?strongColor:weak?weakColor:baseColor
   ctx.fillStyle=color
   ctx.fillRect(x-size-gap,y-1,size,2); ctx.fillRect(x+gap+1,y-1,size,2)
   ctx.fillRect(x-1,y-size-gap,2,size); ctx.fillRect(x-1,y+gap+1,2,size)
   ctx.fillRect(x-2,y-2,4,4)
-  // 플레이어 라벨 (데스크탑 2P일 때만)
-  if (!isMobile) {
-    const label = p2 ? 'P2' : 'P1'
-    ctx.font = '700 9px "Courier New"'; ctx.textAlign='center'
-    ctx.fillStyle = color; ctx.fillText(label, x, y-size-gap-4)
-  }
+  const label=p2?'P2':'P1'
+  ctx.font='700 9px "Courier New"'; ctx.textAlign='center'
+  ctx.fillStyle=color; ctx.fillText(label, x, y-size-gap-4)
   if (strong) {
-    ctx.globalAlpha=0.30; ctx.fillStyle=strongColor
-    ctx.beginPath(); ctx.arc(x,y,40,0,Math.PI*2); ctx.fill()
-    ctx.globalAlpha=0.15; ctx.beginPath(); ctx.arc(x,y,60,0,Math.PI*2); ctx.fill()
-    ctx.globalAlpha=1
+    ctx.globalAlpha=0.30; ctx.fillStyle=strongColor; ctx.beginPath(); ctx.arc(x,y,40,0,Math.PI*2); ctx.fill()
+    ctx.globalAlpha=0.15; ctx.beginPath(); ctx.arc(x,y,60,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1
   } else if (weak) {
-    ctx.globalAlpha=0.20; ctx.fillStyle=weakColor
-    ctx.beginPath(); ctx.arc(x,y,22,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1
+    ctx.globalAlpha=0.20; ctx.fillStyle=weakColor; ctx.beginPath(); ctx.arc(x,y,22,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1
   }
 }
-function drawWaveBanner() {
-  const msg=`WAVE  ${wave}  CLEAR!`, sz=5
-  const x=canvas.width/2-textW(msg,sz)/2, y=canvas.height/2-sz*5/2
-  const alpha=Math.min(1,waveDelay)*(waveDelay<1?waveDelay:1)
+function drawWaveBanner(g, gw) {
+  const msg=`WAVE  ${g.wave}  CLEAR!`, sz=5
+  const x=gw/2-textW(msg,sz)/2, y=canvas.height/2-sz*5/2
+  const alpha=Math.min(1,g.waveDelay)*(g.waveDelay<1?g.waveDelay:1)
   ctx.globalAlpha=alpha
   drawText(msg,x+2,y+2,'#000',sz); drawText(msg,x,y,'#ffeb3b',sz)
   ctx.globalAlpha=1
   const sub='GET READY!', ss=2
   ctx.globalAlpha=alpha*(0.5+0.5*Math.sin(Date.now()/300))
-  drawText(sub,canvas.width/2-textW(sub,ss)/2,y+sz*7,'#00ff88',ss)
+  drawText(sub,gw/2-textW(sub,ss)/2,y+sz*7,'#00ff88',ss)
   ctx.globalAlpha=1
 }
 
@@ -1034,101 +986,127 @@ function drawLeaderboard(cx, startY, highlightNick, maxRows=20) {
 // ─── START SCREEN ────────────────────────────────────────────────────────────
 function drawStartScreen() {
   const cx=canvas.width/2, cy=canvas.height/2
-
-  // Title
   const title='BLINK FIRE', ts=6
   drawText(title, cx-textW(title,ts)/2+3, cy-180+3, '#000', ts)
   drawText(title, cx-textW(title,ts)/2,   cy-180,   '#ffeb3b', ts)
-
-  // Instructions
-  const lines = isMobile
-    ? [{t:'DRAG TO AIM', c:'#666', s:2}, {t:'TAP TO SHOOT', c:'#666', s:2}]
-    : [{t:'MOVE YOUR HEAD TO AIM', c:'#666', s:2}, {t:'BLINK TO SHOOT', c:'#666', s:2}]
+  const lines=[{t:'MOVE YOUR HEAD TO AIM',c:'#555',s:2},{t:'BLINK TO SHOOT',c:'#555',s:2}]
   lines.forEach((l,i)=>{ drawText(l.t, cx-textW(l.t,l.s)/2, cy-110+i*22, l.c, l.s) })
+  drawSprite('slime',cx-72,cy-58); drawSprite('bat',cx-12,cy-54); drawSprite('skeleton',cx+44,cy-58)
 
-  // Sprites
-  drawSprite('slime',    cx-72, cy-58)
-  drawSprite('bat',      cx-12, cy-54)
-  drawSprite('skeleton', cx+44, cy-58)
+  // 모드 선택 버튼
+  const m1='1P MODE', m2='2P VS', ms=3
+  const m1x=cx-140, m2x=cx+20, my=cy-8
+  const m1sel=gameMode==='1p', m2sel=gameMode==='2p'
+  // 선택된 모드 박스
+  ctx.strokeStyle=m1sel?'#00ff88':'#2a2a4a'; ctx.lineWidth=2
+  ctx.strokeRect(m1x-8,my-6,textW(m1,ms)+16,ms*5+12)
+  ctx.strokeStyle=m2sel?'#00e5ff':'#2a2a4a'
+  ctx.strokeRect(m2x-8,my-6,textW(m2,ms)+16,ms*5+12)
+  drawText(m1,m1x,my,m1sel?'#00ff88':'#444',ms)
+  drawText(m2,m2x,my,m2sel?'#00e5ff':'#444',ms)
 
-  // START 안내
-  const st = isMobile ? 'TAP TO START' : 'BLINK LONG TO START', ss=3
+  const hint2='PRESS 1 OR 2 TO SELECT', h2s=1
+  drawText(hint2, cx-textW(hint2,h2s)/2, my+ms*5+18, '#333', h2s)
+
+  const st='BLINK LONG TO START', ss=3
   ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
-  drawText(st, cx-textW(st,ss)/2, cy-10, '#00ff88', ss)
+  drawText(st, cx-textW(st,ss)/2, cy+32, '#00ff88', ss)
   ctx.globalAlpha=1
 
-  // 2P 감지 표시 (데스크탑만)
-  if (!isMobile && face2Visible) {
-    const p2t='2P DETECTED!', p2s=2
+  // 2P 얼굴 감지
+  if (g1.faceVisible && g2.faceVisible) {
+    const p2t='2P READY!', p2s=2
     ctx.globalAlpha=0.7+0.3*Math.sin(Date.now()/300)
-    drawText(p2t, cx-textW(p2t,p2s)/2, cy+18, '#00e5ff', p2s)
+    drawText(p2t, cx-textW(p2t,p2s)/2, cy+58, '#00e5ff', p2s)
     ctx.globalAlpha=1
   }
-
-  // Leaderboard (top 20, 2-column)
-  drawLeaderboard(cx, cy+40, playerNick, 20)
+  drawLeaderboard(cx, cy+72, g1.playerNick, 20)
 }
 
-// ─── GAME OVER SCREEN ────────────────────────────────────────────────────────
-function drawGameOver() {
-  // scoreOverlay(HTML 랭킹 화면)가 열려 있으면 캔버스 화면 생략
+// ─── GAME OVER SCREEN (1P) ────────────────────────────────────────────────────
+function drawGameOver(g, gw) {
   if (!document.getElementById('scoreOverlay').classList.contains('hidden')) return
-
-  const cx=canvas.width/2, cy=canvas.height/2
-
-  const go='GAME OVER', gs=6
-  drawText(go, cx-textW(go,gs)/2+3, cy-100+3, '#000', gs)
-  drawText(go, cx-textW(go,gs)/2,   cy-100,   '#f44336', gs)
-
-  // Score
-  const sc=`SCORE : ${score}`, ss=3
-  drawText(sc, cx-textW(sc,ss)/2, cy-30, '#fff', ss)
-  const wt=`WAVE : ${wave}`
-  drawText(wt, cx-textW(wt,ss)/2, cy,    '#ffeb3b', ss)
-
-  // Rank highlight
-  if (playerNick) {
-    const rank=leaderboard.findIndex(e=>e.nick.toUpperCase()===playerNick.toUpperCase())
-    if (rank>=0) {
-      const rt=`YOUR RANK : #${rank+1}`, rs=2
-      drawText(rt, cx-textW(rt,rs)/2, cy+24, '#00ff88', rs)
-    }
-  }
-
-  // Retry — 쿨다운 끝난 후에만 표시
-  if (gameOverCooldown <= 0) {
+  const cx=gw/2, cy=canvas.height/2
+  const go='GAME OVER', gs=5
+  drawText(go, cx-textW(go,gs)/2+2, cy-80+2, '#000', gs)
+  drawText(go, cx-textW(go,gs)/2,   cy-80,   '#f44336', gs)
+  const sc=`SCORE:${g.score}`, ss=3
+  drawText(sc, cx-textW(sc,ss)/2, cy-20, '#fff', ss)
+  drawText(`WAVE:${g.wave}`, cx-textW(`WAVE:${g.wave}`,ss)/2, cy+4, '#ffeb3b', ss)
+  if (g.gameOverCooldown<=0) {
     const rtt='BLINK LONG TO RETRY', rs2=2
     ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
-    drawText(rtt, cx-textW(rtt,rs2)/2, cy+50, '#00ff88', rs2)
+    drawText(rtt, cx-textW(rtt,rs2)/2, cy+36, '#00ff88', rs2)
     ctx.globalAlpha=1
   }
+}
 
+// ─── VICTORY SCREEN (2P) ─────────────────────────────────────────────────────
+function drawVictoryScreen() {
+  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,0,canvas.width,canvas.height)
+  const cx=canvas.width/2, cy=canvas.height/2
+  if (twoPlayerWinner===3) {
+    const msg='DRAW!', sz=8
+    drawText(msg, cx-textW(msg,sz)/2+4, cy-70+4, '#000', sz)
+    drawText(msg, cx-textW(msg,sz)/2, cy-70, '#ffeb3b', sz)
+  } else {
+    const wn=`P${twoPlayerWinner} WINS!`, sz=7
+    const col=twoPlayerWinner===1?'#00ff88':'#00e5ff'
+    drawText(wn, cx-textW(wn,sz)/2+3, cy-70+3, '#000', sz)
+    drawText(wn, cx-textW(wn,sz)/2, cy-70, col, sz)
+  }
+  const s1=`P1: ${g1.score.toLocaleString()}`, s2=`P2: ${g2.score.toLocaleString()}`, ss=3
+  drawText(s1, cx-textW(s1,ss)/2, cy+8,  twoPlayerWinner===1?'#00ff88':'#888', ss)
+  drawText(s2, cx-textW(s2,ss)/2, cy+32, twoPlayerWinner===2?'#00e5ff':'#888', ss)
+  const rtt='BLINK LONG TO PLAY AGAIN', rs=2
+  ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
+  drawText(rtt, cx-textW(rtt,rs)/2, cy+66, '#00ff88', rs)
+  ctx.globalAlpha=1
+}
+
+// ─── DRAW ONE GAME HALF ───────────────────────────────────────────────────────
+function drawGameHalf(g, ox, gw, isP2) {
+  ctx.save()
+  ctx.beginPath(); ctx.rect(ox,0,gw,canvas.height); ctx.clip()
+  ctx.translate(ox,0)
+  if (g.state==='gameover') {
+    drawGameOver(g, gw)
+  } else {
+    ctx.save(); ctx.translate(g.shakeX,g.shakeY)
+    drawBulletTrails(g); drawEnemies(g); drawShockwaves(g)
+    drawParticles(g); drawFlashes(g); drawMuzzleFlashes(g); drawScorePopups(g)
+    for (const it of g.items) drawItem(it)
+    ctx.restore()
+    drawHUD(g,gw); if(g.state==='waveclear') drawWaveBanner(g,gw)
+  }
+  if (g.itemFlash.alpha>0) { ctx.fillStyle=`rgba(${hexToRgb(g.itemFlash.color)},${g.itemFlash.alpha.toFixed(2)})`; ctx.fillRect(0,0,gw,canvas.height) }
+  if (g.flashScreen>0) { ctx.fillStyle=`rgba(255,200,100,${g.flashScreen})`; ctx.fillRect(0,0,gw,canvas.height) }
+  for (let y=0;y<canvas.height;y+=4) { ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(0,y,gw,2) }
+  if (g.crosshair.visible) drawCrosshair(g.crosshair, g.blinkPower, g.gameStartCooldown, isP2)
+  if (!g.faceVisible && (g.state==='playing'||g.state==='waveclear')) {
+    const hint='SHOW YOUR FACE', sz=2
+    ctx.globalAlpha=0.4+0.4*Math.sin(Date.now()/500)
+    drawText(hint,gw/2-textW(hint,sz)/2,canvas.height-52,'#888',sz)
+    ctx.globalAlpha=1
+  }
+  ctx.restore()
 }
 
 // ─── MAIN DRAW ───────────────────────────────────────────────────────────────
 function draw() {
+  const gw = gameMode==='2p' ? canvas.width/2 : canvas.width
   ctx.fillStyle='#06060f'; ctx.fillRect(0,0,canvas.width,canvas.height)
   drawStars()
-  if      (state==='start')    drawStartScreen()
-  else if (state==='gameover') drawGameOver()
-  else {
-    ctx.save(); ctx.translate(shakeX,shakeY)
-    drawBulletTrails(); drawEnemies(); drawShockwaves()
-    drawParticles(); drawFlashes(); drawMuzzleFlashes(); drawScorePopups()
-    for (const it of items) drawItem(it)
-    ctx.restore()
-    drawHUD(); if(state==='waveclear') drawWaveBanner()
-  }
-  if (itemFlash.alpha>0) { ctx.fillStyle=`rgba(${hexToRgb(itemFlash.color)},${itemFlash.alpha.toFixed(2)})`; ctx.fillRect(0,0,canvas.width,canvas.height) }
-  if (flashScreen>0) { ctx.fillStyle=`rgba(255,200,100,${flashScreen})`; ctx.fillRect(0,0,canvas.width,canvas.height) }
-  for (let y=0;y<canvas.height;y+=4) { ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(0,y,canvas.width,2) }
-  if (crosshair.visible)  drawCrosshair(crosshair,  blinkPower,  false)
-  if (crosshair2.visible) drawCrosshair(crosshair2, blinkPower2, true)
-  if (!isMobile && !faceVisible && !face2Visible && (state==='playing'||state==='waveclear')) {
-    const hint='SHOW YOUR FACE', sz=2
-    ctx.globalAlpha=0.4+0.4*Math.sin(Date.now()/500)
-    drawText(hint,canvas.width/2-textW(hint,sz)/2,canvas.height-52,'#888',sz)
-    ctx.globalAlpha=1
+  if (g1.state==='start') {
+    drawStartScreen()
+  } else if (gameMode==='2p') {
+    drawGameHalf(g1, 0, gw, false)
+    drawGameHalf(g2, gw, gw, true)
+    // 중앙 구분선
+    ctx.fillStyle='#2a2a4a'; ctx.fillRect(gw-1,0,2,canvas.height)
+    if (twoPlayerWinner>0) drawVictoryScreen()
+  } else {
+    drawGameHalf(g1, 0, gw, false)
   }
 }
 
@@ -1153,7 +1131,7 @@ function renderLbPreview() {
   const rowsB = document.getElementById('lbRowsB')
   if (!leaderboard.length) { rowsA.textContent = '아직 기록이 없어요'; rowsB.textContent=''; return }
   const makeRow = (e, i) => {
-    const isMe = playerNick && e.nick.toUpperCase() === playerNick.toUpperCase()
+    const isMe = g1.playerNick && e.nick.toUpperCase() === g1.playerNick.toUpperCase()
     const cls  = isMe ? 'lb-row lb-me' : 'lb-row'
     return `<div class="${cls}">
       <span class="lb-rank">${i+1}.</span>
@@ -1166,11 +1144,10 @@ function renderLbPreview() {
 }
 
 function showScoreOverlay() {
-  document.getElementById('finalScore').textContent = score
-  document.getElementById('finalWave').textContent  = wave
+  document.getElementById('finalScore').textContent = g1.score
+  document.getElementById('finalWave').textContent  = g1.wave
   nickForm.classList.remove('hidden')
   doneMsg.classList.add('hidden')
-  // 이전 닉네임 자동 채워두기 (변경 가능)
   nickInput.value = ''
   submitBtn.textContent = 'SUBMIT SCORE'
   submitBtn.disabled = false
@@ -1193,13 +1170,13 @@ function showDone(msg) {
 async function doSubmit() {
   const n = nickInput.value.trim()
   if (!n) { nickInput.focus(); return }
-  playerNick = n
+  g1.playerNick = n
   submitBtn.textContent = '등록 중...'
   submitBtn.disabled = true
-  await submitScore(playerNick, score)
+  await submitScore(g1.playerNick, g1.score)
   leaderboard = await fetchLeaderboard()
-  scoreSubmitted = true
-  localStorage.setItem('blinkfire_nick', playerNick)
+  g1.scoreSubmitted = true
+  localStorage.setItem('blinkfire_nick', g1.playerNick)
   showDone('🏆 랭킹 등록 완료!')
 }
 
@@ -1210,17 +1187,27 @@ retryBtn.addEventListener('click', () => { hideScoreOverlay(); startGame() })
 // ─── INPUT: 데스크탑 마우스 ───────────────────────────────────────────────────
 canvas.addEventListener('click', e => {
   if (isMobile) return
-  if (scoreOverlay.classList.contains('hidden') && !faceVisible) {
-    if (state==='playing') tryShoot(e.clientX, e.clientY)
-    else if (state==='start') startGame()
-    else if (state==='gameover') startGame()
+  if (!scoreOverlay.classList.contains('hidden')) return
+  if (g1.state==='start' || twoPlayerWinner>0) { startGame(); return }
+  const gw = gameMode==='2p' ? canvas.width/2 : canvas.width
+  if (gameMode==='2p') {
+    if (e.clientX < gw) { if (!g1.faceVisible) tryShoot(g1, e.clientX, e.clientY) }
+    else                { if (!g2.faceVisible) tryShoot(g2, e.clientX-gw, e.clientY) }
+  } else {
+    if (g1.state==='playing' && !g1.faceVisible) tryShoot(g1, e.clientX, e.clientY)
+    else if (g1.state==='gameover') startGame()
   }
 })
 canvas.addEventListener('mousemove', e => {
   if (isMobile) return
-  if (!faceVisible) { crosshair.x=e.clientX; crosshair.y=e.clientY; crosshair.visible=true }
+  const gw = gameMode==='2p' ? canvas.width/2 : canvas.width
+  if (!g1.faceVisible) { g1.crosshair.x=e.clientX; g1.crosshair.y=e.clientY; g1.crosshair.visible=true }
+  if (gameMode==='2p' && !g2.faceVisible) { g2.crosshair.x=e.clientX-gw; g2.crosshair.y=e.clientY; g2.crosshair.visible=true }
 })
-canvas.addEventListener('mouseleave', () => { if(!isMobile && !faceVisible) crosshair.visible=false })
+canvas.addEventListener('mouseleave', () => {
+  if (!isMobile && !g1.faceVisible) g1.crosshair.visible=false
+  if (!isMobile && !g2.faceVisible) g2.crosshair.visible=false
+})
 
 // ─── INPUT: 모바일 터치 ────────────────────────────────────────────────────────
 if (isMobile) {
@@ -1230,8 +1217,8 @@ if (isMobile) {
     e.preventDefault()
     const t = e.touches[0]
     _touchStartX = t.clientX; _touchStartY = t.clientY; _touchStartTime = Date.now()
-    crosshair.x = t.clientX; crosshair.y = t.clientY; crosshair.visible = true
-    if ((state==='start' || state==='gameover') && gameOverCooldown <= 0) {
+    g1.crosshair.x = t.clientX; g1.crosshair.y = t.clientY; g1.crosshair.visible = true
+    if ((g1.state==='start' || g1.state==='gameover') && g1.gameOverCooldown <= 0) {
       if (scoreOverlay.classList.contains('hidden')) startGame()
     }
   }, { passive:false })
@@ -1239,18 +1226,17 @@ if (isMobile) {
   canvas.addEventListener('touchmove', e => {
     e.preventDefault()
     const t = e.touches[0]
-    crosshair.x = t.clientX; crosshair.y = t.clientY
+    g1.crosshair.x = t.clientX; g1.crosshair.y = t.clientY
   }, { passive:false })
 
   canvas.addEventListener('touchend', e => {
     e.preventDefault()
-    if (state !== 'playing') return
+    if (g1.state !== 'playing') return
     const dur = Date.now() - _touchStartTime
     const dx = e.changedTouches[0].clientX - _touchStartX
     const dy = e.changedTouches[0].clientY - _touchStartY
     const moved = Math.hypot(dx, dy)
-    // 탭(짧고 이동 적으면) → 발사
-    if (dur < 250 && moved < 18) tryShoot(crosshair.x, crosshair.y)
+    if (dur < 250 && moved < 18) tryShoot(g1, g1.crosshair.x, g1.crosshair.y)
   }, { passive:false })
 }
 
@@ -1270,9 +1256,10 @@ const faceMesh = new FaceMesh({
 })
 faceMesh.setOptions({ maxNumFaces:2, refineLandmarks:true, minDetectionConfidence:0.6, minTrackingConfidence:0.5 })
 
-function processFace(lm, ch, getBlinkPower, setBlinkPower, getBlinkStart, setBlinkStart, getBlinkType, setBlinkType) {
-  // 조준: 코끝 고개 방향 + 적응형 스무딩
-  const rawX=((1-lm[1].x)-0.5)*canvas.width*HEAD_SENS_X + canvas.width/2
+// g = 게임 인스턴스, gw = 게임 너비(로컬 좌표계)
+function processFace(lm, g, gw) {
+  const ch = g.crosshair
+  const rawX=((1-lm[1].x)-0.5)*gw*HEAD_SENS_X + gw/2
   const rawY=(lm[1].y-0.4)*canvas.height*HEAD_SENS_Y + canvas.height/2
   if (!ch.visible) { ch.x=rawX; ch.y=rawY }
   else {
@@ -1281,52 +1268,46 @@ function processFace(lm, ch, getBlinkPower, setBlinkPower, getBlinkStart, setBli
     ch.x=smooth*rawX+(1-smooth)*ch.x
     ch.y=smooth*rawY+(1-smooth)*ch.y
   }
-  ch.visible=true
+  ch.visible=true; g.faceVisible=true
 
-  // 눈 깜빡임 감지
   const earL=eyeAR(lm,159,145,33,133), earR=eyeAR(lm,386,374,362,263)
   const leftClosed=earL<BLINK_THRESH, rightClosed=earR<BLINK_THRESH
   const bothClosed=leftClosed&&rightClosed
   const oneClosed=(leftClosed||rightClosed)&&!bothClosed
   const nowBlink=leftClosed||rightClosed
-  const power=bothClosed?2:oneClosed?1:0
-  setBlinkPower(power)
+  g.blinkPower=bothClosed?2:oneClosed?1:0
 
-  const bs=getBlinkStart()
-  if (nowBlink && bs===0) { setBlinkStart(Date.now()); setBlinkType(bothClosed?2:1) }
-  if (!nowBlink && bs>0) {
-    const dur=Date.now()-bs; setBlinkStart(0)
-    if (dur>60&&dur<450&&gameStartCooldown<=0&&state==='playing') tryShoot(ch.x,ch.y,getBlinkType())
-    else if (dur>=800 && gameOverCooldown<=0) {
-      if ((state==='start'||state==='gameover') && scoreOverlay.classList.contains('hidden')) startGame()
+  if (nowBlink && g.blinkStart===0) { g.blinkStart=Date.now(); g.blinkType=bothClosed?2:1 }
+  if (!nowBlink && g.blinkStart>0) {
+    const dur=Date.now()-g.blinkStart; g.blinkStart=0
+    if (dur>60&&dur<450&&g.gameStartCooldown<=0&&g.state==='playing') tryShoot(g,ch.x,ch.y,g.blinkType)
+    else if (dur>=800 && g.gameOverCooldown<=0) {
+      const overlay = document.getElementById('scoreOverlay')
+      if ((g.state==='start'||g.state==='gameover'||twoPlayerWinner>0) && overlay.classList.contains('hidden')) startGame()
     }
-    setBlinkType(0)
+    g.blinkType=0
   }
 }
 
 faceMesh.onResults(results => {
   const faces = results.multiFaceLandmarks || []
+  const gw = gameMode==='2p' ? canvas.width/2 : canvas.width
 
-  // P1
-  if (faces.length >= 1) {
-    faceVisible = true
-    processFace(faces[0], crosshair,
-      ()=>blinkPower,  v=>{ blinkPower=v },
-      ()=>blinkStart,  v=>{ blinkStart=v },
-      ()=>blinkType,   v=>{ blinkType=v })
+  // 2P 모드: 코 x 좌표 기준 정렬 (큰 쪽 = 카메라 오른쪽 = 물리적 왼쪽 = P1)
+  const sorted = faces.length >= 2
+    ? [...faces].sort((a,b) => b[1].x - a[1].x)
+    : faces
+
+  if (sorted.length >= 1) {
+    processFace(sorted[0], g1, gw)
   } else {
-    faceVisible=false; crosshair.visible=false; blinkPower=0
+    g1.faceVisible=false; g1.crosshair.visible=false; g1.blinkPower=0
   }
 
-  // P2
-  if (faces.length >= 2) {
-    face2Visible = true
-    processFace(faces[1], crosshair2,
-      ()=>blinkPower2, v=>{ blinkPower2=v },
-      ()=>blinkStart2, v=>{ blinkStart2=v },
-      ()=>blinkType2,  v=>{ blinkType2=v })
+  if (sorted.length >= 2) {
+    processFace(sorted[1], g2, gameMode==='2p' ? gw : canvas.width)
   } else {
-    face2Visible=false; crosshair2.visible=false; blinkPower2=0
+    g2.faceVisible=false; g2.crosshair.visible=false; g2.blinkPower=0
   }
 })
 
