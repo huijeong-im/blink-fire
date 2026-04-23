@@ -53,6 +53,33 @@
                         animation: px-blink 1s steps(1) infinite; }
     #loading .px-hint::before { content: '▶  '; color: var(--green); }
 
+    /* ── 모바일 안내 화면 ── */
+    #mobileBlock {
+      display: none;
+      position: fixed; inset: 0; background: var(--bg); z-index: 100;
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 28px; padding: 32px;
+      background-image: repeating-linear-gradient(
+        0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 4px
+      );
+      text-align: center;
+    }
+    #mobileBlock .mb-title {
+      font-family: var(--px); font-size: clamp(13px,4vw,20px);
+      color: var(--yellow); letter-spacing: 4px;
+      text-shadow: 3px 3px 0 #000, 0 0 30px rgba(255,235,59,0.25);
+    }
+    #mobileBlock .mb-icon { font-size: 48px; line-height: 1; }
+    #mobileBlock .mb-msg {
+      font-family: var(--ko); font-size: 13px; color: #aaa;
+      line-height: 2; max-width: 320px;
+    }
+    #mobileBlock .mb-url {
+      font-family: var(--ko); font-size: 12px; color: var(--green);
+      background: #0a1a12; border: 1px solid #1a4a2a;
+      padding: 10px 18px; letter-spacing: 1px;
+    }
+
     /* ── 픽셀 윈도우 오버레이 ── */
     #scoreOverlay {
       position: fixed; inset: 0; background: rgba(6,6,15,0.93);
@@ -237,6 +264,14 @@
       <button id="retryBtn" class="px-btn">PLAY AGAIN</button>
     </div>
   </div>
+</div>
+
+<!-- 모바일 차단 안내 -->
+<div id="mobileBlock">
+  <div class="mb-icon">💻</div>
+  <div class="mb-title">BLINK FIRE</div>
+  <div class="mb-msg">이 게임은 카메라가 있는<br>PC 환경에서 즐길 수 있어요.<br><br>눈을 깜빡여서 총을 쏘는<br>얼굴 인식 슈팅 게임이에요!</div>
+  <div class="mb-url">huijeong-im.github.io/blink-fire/</div>
 </div>
 
 <canvas id="gameCanvas"></canvas>
@@ -1340,9 +1375,8 @@ function startCamera() {
 }
 
 if (isMobile) {
-  // 모바일: 카메라 불필요, 리더보드만 로드 후 바로 게임 진입
-  document.getElementById('camCanvas').style.display = 'none'
-  fetchLeaderboard().then(lb => { leaderboard=lb; lbLoaded=true })
+  // 모바일: 게임 차단, 안내 화면 표시
+  document.getElementById('mobileBlock').style.display = 'flex'
   loading.classList.add('hidden')
 } else {
   startCamera()
