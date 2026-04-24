@@ -814,10 +814,13 @@ function updateGame(g, dt, gw) {
 function updateCPU(dt, gw) {
   if (g2.state !== 'playing') return
 
-  // 가장 위험한 적 (x 좌표가 가장 작은 = 화면 왼쪽에 가장 가까운)
+  // 가장 위험한 적 또는 아이템 (x 좌표가 가장 작은 = 화면 왼쪽에 가장 가까운)
   let target = null
   for (const e of g2.enemies) {
     if (!target || e.x < target.x) target = e
+  }
+  for (const it of g2.items) {
+    if (!target || it.x < target.x) target = it
   }
 
   // 타겟이 바뀌면 반응 딜레이 리셋
