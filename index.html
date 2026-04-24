@@ -561,6 +561,16 @@ let _scoreOverlayTimer = null
 
 let gameMode        = '1p'   // '1p' or '2p'
 let twoPlayerWinner = 0      // 0=none 1=P1wins 2=P2wins 3=draw
+let cpuMode         = false  // true when 1P mode is running CPU opponent
+
+// CPU AI 상태
+const cpu = {
+  target: null,           // 현재 조준 중인 적
+  reactTimer: 0,          // 새 목표 반응 지연
+  jitterX: 0, jitterY: 0, // 조준 흔들림
+  jitterTimer: 0,
+  shootCooldown: 0,
+}
 
 function createGameState() {
   return {
@@ -709,15 +719,20 @@ function startGame() {
   hideScoreOverlay()
   SFX.gameStart(); BGM.start()
   twoPlayerWinner = 0
+  cpuMode = gameMode === '1p'
+  if (cpuMode) {
+    cpu.target=null; cpu.reactTimer=0
+    cpu.jitterX=0; cpu.jitterY=0; cpu.jitterTimer=0; cpu.shootCooldown=0
+  }
   initGame(g1)
-  if (gameMode==='2p') initGame(g2)
+  if (gameMode==='2p' || cpuMode) initGame(g2)
 }
 
 function loseLife(g) {
   g.lives--; g.flashScreen=0.5
   if (g.lives<=0) {
     g.state='gameover'; g.gameOverCooldown=3.0
-    if (gameMode==='2p') {
+    if (gameMode==='2p' || cpuMode) {
       BGM.stop(); SFX.gameOver()
       const other = g===g1 ? g2 : g1
       if (other.state==='gameover') {
@@ -795,11 +810,64 @@ function updateGame(g, dt, gw) {
   }
 }
 
+// ─── CPU AI ──────────────────────────────────────────────────────────────────
+function updateCPU(dt, gw) {
+  if (g2.state !== 'playing') return
+
+  // 가장 위험한 적 (x 좌표가 가장 작은 = 화면 왼쪽에 가장 가까운)
+  let target = null
+  for (const e of g2.enemies) {
+    if (!target || e.x < target.x) target = e
+  }
+
+  // 타겟이 바뀌면 반응 딜레이 리셋
+  if (target !== cpu.target) {
+    cpu.target = target
+    cpu.reactTimer = 0.5 + Math.random() * 0.5  // 0.5~1.0s 반응 시간
+  }
+
+  cpu.reactTimer   = Math.max(0, cpu.reactTimer   - dt)
+  cpu.shootCooldown = Math.max(0, cpu.shootCooldown - dt)
+
+  // 조준 흔들림 갱신
+  cpu.jitterTimer -= dt
+  if (cpu.jitterTimer <= 0) {
+    cpu.jitterX = (Math.random() - 0.5) * 70  // ±35px 흔들림
+    cpu.jitterY = (Math.random() - 0.5) * 70
+    cpu.jitterTimer = 0.12 + Math.random() * 0.18
+  }
+
+  g2.faceVisible = true
+  if (target && cpu.reactTimer <= 0) {
+    // 타겟 + 흔들림 위치로 조준
+    const tx = target.x + cpu.jitterX
+    const ty = target.y + cpu.jitterY
+    g2.crosshair.x += (tx - g2.crosshair.x) * Math.min(1, dt * 3.5)
+    g2.crosshair.y += (ty - g2.crosshair.y) * Math.min(1, dt * 3.5)
+    g2.crosshair.visible = true
+
+    // 조준이 충분히 가까우면 발사
+    const dist = Math.hypot(g2.crosshair.x - target.x, g2.crosshair.y - target.y)
+    if (dist < 65 && cpu.shootCooldown <= 0 && g2.canShoot) {
+      tryShoot(g2, g2.crosshair.x, g2.crosshair.y)
+      cpu.shootCooldown = 0.2 + Math.random() * 0.3
+    }
+  } else if (!target) {
+    // 적 없으면 중앙으로
+    g2.crosshair.x += (gw/2 - g2.crosshair.x) * Math.min(1, dt * 2)
+    g2.crosshair.y += (canvas.height/2 - g2.crosshair.y) * Math.min(1, dt * 2)
+    g2.crosshair.visible = true
+  }
+}
+
 function update(dt) {
-  const gw = gameMode==='2p' ? canvas.width/2 : canvas.width
+  const gw = (gameMode==='2p' || cpuMode) ? canvas.width/2 : canvas.width
   updateStars(dt)
   if (twoPlayerWinner===0) updateGame(g1, dt, gw)
-  if (gameMode==='2p' && twoPlayerWinner===0) updateGame(g2, dt, gw)
+  if ((gameMode==='2p' || cpuMode) && twoPlayerWinner===0) {
+    updateGame(g2, dt, gw)
+    if (cpuMode) updateCPU(dt, gw)
+  }
 }
 let frameTime = 0
 
@@ -908,16 +976,18 @@ function drawHUD(g, gw) {
     ctx.fillRect(bx,by,Math.floor(bw*ratio),bh)
   }
 }
-function drawCrosshair(ch, power, startCd, p2=false) {
+function drawCrosshair(ch, power, startCd, p2=false, isCPU=false) {
   const {x,y}=ch, size=38, gap=8
   const strong=power>=2&&startCd<=0, weak=power===1&&startCd<=0
-  const baseColor=p2?'#00e5ff':'#00ff88', weakColor=p2?'#ff6ec7':'#ffeb3b', strongColor=p2?'#ff1744':'#ff8c00'
+  const baseColor=isCPU?'#ff6d00':p2?'#00e5ff':'#00ff88'
+  const weakColor=isCPU?'#ff9800':p2?'#ff6ec7':'#ffeb3b'
+  const strongColor=isCPU?'#dd2c00':p2?'#ff1744':'#ff8c00'
   const color=strong?strongColor:weak?weakColor:baseColor
   ctx.fillStyle=color
   ctx.fillRect(x-size-gap,y-1,size,2); ctx.fillRect(x+gap+1,y-1,size,2)
   ctx.fillRect(x-1,y-size-gap,2,size); ctx.fillRect(x-1,y+gap+1,2,size)
   ctx.fillRect(x-2,y-2,4,4)
-  const label=p2?'P2':'P1'
+  const label=isCPU?'CPU':p2?'P2':'P1'
   ctx.font='700 9px "Courier New"'; ctx.textAlign='center'
   ctx.fillStyle=color; ctx.fillText(label, x, y-size-gap-4)
   if (strong) {
@@ -994,8 +1064,8 @@ function drawStartScreen() {
   drawSprite('slime',cx-72,cy-58); drawSprite('bat',cx-12,cy-54); drawSprite('skeleton',cx+44,cy-58)
 
   // 모드 선택 버튼
-  const m1='1P MODE', m2='2P VS', ms=3
-  const m1x=cx-140, m2x=cx+20, my=cy-8
+  const m1='1P VS CPU', m2='2P VS', ms=3
+  const m1x=cx-110, m2x=cx+50, my=cy-8
   const m1sel=gameMode==='1p', m2sel=gameMode==='2p'
   // 선택된 모드 박스
   ctx.strokeStyle=m1sel?'#00ff88':'#2a2a4a'; ctx.lineWidth=2
@@ -1014,7 +1084,7 @@ function drawStartScreen() {
   ctx.globalAlpha=1
 
   // 2P 얼굴 감지
-  if (g1.faceVisible && g2.faceVisible) {
+  if (gameMode==='2p' && g1.faceVisible && g2.faceVisible) {
     const p2t='2P READY!', p2s=2
     ctx.globalAlpha=0.7+0.3*Math.sin(Date.now()/300)
     drawText(p2t, cx-textW(p2t,p2s)/2, cy+58, '#00e5ff', p2s)
@@ -1041,7 +1111,7 @@ function drawGameOver(g, gw) {
   }
 }
 
-// ─── VICTORY SCREEN (2P) ─────────────────────────────────────────────────────
+// ─── VICTORY SCREEN (2P / 1P vs CPU) ─────────────────────────────────────────
 function drawVictoryScreen() {
   ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,0,canvas.width,canvas.height)
   const cx=canvas.width/2, cy=canvas.height/2
@@ -1050,14 +1120,24 @@ function drawVictoryScreen() {
     drawText(msg, cx-textW(msg,sz)/2+4, cy-70+4, '#000', sz)
     drawText(msg, cx-textW(msg,sz)/2, cy-70, '#ffeb3b', sz)
   } else {
-    const wn=`P${twoPlayerWinner} WINS!`, sz=7
-    const col=twoPlayerWinner===1?'#00ff88':'#00e5ff'
+    let wn, col
+    if (cpuMode) {
+      wn  = twoPlayerWinner===1 ? 'YOU WIN!' : 'CPU WINS!'
+      col = twoPlayerWinner===1 ? '#00ff88'  : '#ff6d00'
+    } else {
+      wn  = `P${twoPlayerWinner} WINS!`
+      col = twoPlayerWinner===1 ? '#00ff88' : '#00e5ff'
+    }
+    const sz=7
     drawText(wn, cx-textW(wn,sz)/2+3, cy-70+3, '#000', sz)
     drawText(wn, cx-textW(wn,sz)/2, cy-70, col, sz)
   }
-  const s1=`P1: ${g1.score.toLocaleString()}`, s2=`P2: ${g2.score.toLocaleString()}`, ss=3
-  drawText(s1, cx-textW(s1,ss)/2, cy+8,  twoPlayerWinner===1?'#00ff88':'#888', ss)
-  drawText(s2, cx-textW(s2,ss)/2, cy+32, twoPlayerWinner===2?'#00e5ff':'#888', ss)
+  const l1 = cpuMode ? 'YOU' : 'P1', l2 = cpuMode ? 'CPU' : 'P2'
+  const c1w = twoPlayerWinner===1 ? '#00ff88' : '#888'
+  const c2w = twoPlayerWinner===2 ? (cpuMode?'#ff6d00':'#00e5ff') : '#888'
+  const s1=`${l1}: ${g1.score.toLocaleString()}`, s2=`${l2}: ${g2.score.toLocaleString()}`, ss=3
+  drawText(s1, cx-textW(s1,ss)/2, cy+8,  c1w, ss)
+  drawText(s2, cx-textW(s2,ss)/2, cy+32, c2w, ss)
   const rtt='BLINK LONG TO PLAY AGAIN', rs=2
   ctx.globalAlpha=0.5+0.5*Math.sin(Date.now()/500)
   drawText(rtt, cx-textW(rtt,rs)/2, cy+66, '#00ff88', rs)
@@ -1065,7 +1145,7 @@ function drawVictoryScreen() {
 }
 
 // ─── DRAW ONE GAME HALF ───────────────────────────────────────────────────────
-function drawGameHalf(g, ox, gw, isP2) {
+function drawGameHalf(g, ox, gw, isP2, isCPU=false) {
   ctx.save()
   ctx.beginPath(); ctx.rect(ox,0,gw,canvas.height); ctx.clip()
   ctx.translate(ox,0)
@@ -1082,8 +1162,8 @@ function drawGameHalf(g, ox, gw, isP2) {
   if (g.itemFlash.alpha>0) { ctx.fillStyle=`rgba(${hexToRgb(g.itemFlash.color)},${g.itemFlash.alpha.toFixed(2)})`; ctx.fillRect(0,0,gw,canvas.height) }
   if (g.flashScreen>0) { ctx.fillStyle=`rgba(255,200,100,${g.flashScreen})`; ctx.fillRect(0,0,gw,canvas.height) }
   for (let y=0;y<canvas.height;y+=4) { ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(0,y,gw,2) }
-  if (g.crosshair.visible) drawCrosshair(g.crosshair, g.blinkPower, g.gameStartCooldown, isP2)
-  if (!g.faceVisible && (g.state==='playing'||g.state==='waveclear')) {
+  if (g.crosshair.visible) drawCrosshair(g.crosshair, g.blinkPower, g.gameStartCooldown, isP2, isCPU)
+  if (!isCPU && !g.faceVisible && (g.state==='playing'||g.state==='waveclear')) {
     const hint='SHOW YOUR FACE', sz=2
     ctx.globalAlpha=0.4+0.4*Math.sin(Date.now()/500)
     drawText(hint,gw/2-textW(hint,sz)/2,canvas.height-52,'#888',sz)
@@ -1094,19 +1174,19 @@ function drawGameHalf(g, ox, gw, isP2) {
 
 // ─── MAIN DRAW ───────────────────────────────────────────────────────────────
 function draw() {
-  const gw = gameMode==='2p' ? canvas.width/2 : canvas.width
+  const gw = (gameMode==='2p' || cpuMode) ? canvas.width/2 : canvas.width
   ctx.fillStyle='#06060f'; ctx.fillRect(0,0,canvas.width,canvas.height)
   drawStars()
   if (g1.state==='start') {
     drawStartScreen()
-  } else if (gameMode==='2p') {
-    drawGameHalf(g1, 0, gw, false)
-    drawGameHalf(g2, gw, gw, true)
+  } else if (gameMode==='2p' || cpuMode) {
+    drawGameHalf(g1, 0, gw, false, false)
+    drawGameHalf(g2, gw, gw, true, cpuMode)
     // 중앙 구분선
     ctx.fillStyle='#2a2a4a'; ctx.fillRect(gw-1,0,2,canvas.height)
     if (twoPlayerWinner>0) drawVictoryScreen()
   } else {
-    drawGameHalf(g1, 0, gw, false)
+    drawGameHalf(g1, 0, gw, false, false)
   }
 }
 
@@ -1189,10 +1269,13 @@ canvas.addEventListener('click', e => {
   if (isMobile) return
   if (!scoreOverlay.classList.contains('hidden')) return
   if (g1.state==='start' || twoPlayerWinner>0) { startGame(); return }
-  const gw = gameMode==='2p' ? canvas.width/2 : canvas.width
+  const gw = (gameMode==='2p' || cpuMode) ? canvas.width/2 : canvas.width
   if (gameMode==='2p') {
     if (e.clientX < gw) { if (!g1.faceVisible) tryShoot(g1, e.clientX, e.clientY) }
     else                { if (!g2.faceVisible) tryShoot(g2, e.clientX-gw, e.clientY) }
+  } else if (cpuMode) {
+    // 왼쪽 절반만 플레이어 영역 (오른쪽은 CPU)
+    if (e.clientX < gw && !g1.faceVisible) tryShoot(g1, e.clientX, e.clientY)
   } else {
     if (g1.state==='playing' && !g1.faceVisible) tryShoot(g1, e.clientX, e.clientY)
     else if (g1.state==='gameover') startGame()
@@ -1200,13 +1283,19 @@ canvas.addEventListener('click', e => {
 })
 canvas.addEventListener('mousemove', e => {
   if (isMobile) return
-  const gw = gameMode==='2p' ? canvas.width/2 : canvas.width
-  if (!g1.faceVisible) { g1.crosshair.x=e.clientX; g1.crosshair.y=e.clientY; g1.crosshair.visible=true }
+  const gw = (gameMode==='2p' || cpuMode) ? canvas.width/2 : canvas.width
+  if (!g1.faceVisible) {
+    if (cpuMode || gameMode==='2p') {
+      if (e.clientX < gw) { g1.crosshair.x=e.clientX; g1.crosshair.y=e.clientY; g1.crosshair.visible=true }
+    } else {
+      g1.crosshair.x=e.clientX; g1.crosshair.y=e.clientY; g1.crosshair.visible=true
+    }
+  }
   if (gameMode==='2p' && !g2.faceVisible) { g2.crosshair.x=e.clientX-gw; g2.crosshair.y=e.clientY; g2.crosshair.visible=true }
 })
 canvas.addEventListener('mouseleave', () => {
   if (!isMobile && !g1.faceVisible) g1.crosshair.visible=false
-  if (!isMobile && !g2.faceVisible) g2.crosshair.visible=false
+  if (!isMobile && !cpuMode && !g2.faceVisible) g2.crosshair.visible=false
 })
 
 // ─── INPUT: 모바일 터치 ────────────────────────────────────────────────────────
@@ -1291,7 +1380,7 @@ function processFace(lm, g, gw) {
 
 faceMesh.onResults(results => {
   const faces = results.multiFaceLandmarks || []
-  const gw = gameMode==='2p' ? canvas.width/2 : canvas.width
+  const gw = (gameMode==='2p' || cpuMode) ? canvas.width/2 : canvas.width
 
   // 2P 모드: 코 x 좌표 기준 정렬 (큰 쪽 = 카메라 오른쪽 = 물리적 왼쪽 = P1)
   const sorted = faces.length >= 2
@@ -1304,10 +1393,13 @@ faceMesh.onResults(results => {
     g1.faceVisible=false; g1.crosshair.visible=false; g1.blinkPower=0
   }
 
-  if (sorted.length >= 2) {
-    processFace(sorted[1], g2, gameMode==='2p' ? gw : canvas.width)
-  } else {
-    g2.faceVisible=false; g2.crosshair.visible=false; g2.blinkPower=0
+  // CPU 모드에서는 g2를 얼굴로 제어하지 않음
+  if (!cpuMode) {
+    if (sorted.length >= 2) {
+      processFace(sorted[1], g2, gameMode==='2p' ? gw : canvas.width)
+    } else {
+      g2.faceVisible=false; g2.crosshair.visible=false; g2.blinkPower=0
+    }
   }
 })
 
