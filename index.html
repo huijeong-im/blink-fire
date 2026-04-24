@@ -823,7 +823,7 @@ function updateCPU(dt, gw) {
   // 타겟이 바뀌면 반응 딜레이 리셋
   if (target !== cpu.target) {
     cpu.target = target
-    cpu.reactTimer = 1.0 + Math.random() * 1.0  // 1.0~2.0s 반응 시간
+    cpu.reactTimer = 0.7 + Math.random() * 0.5  // 0.7~1.2s 반응 시간
   }
 
   cpu.reactTimer   = Math.max(0, cpu.reactTimer   - dt)
@@ -832,9 +832,9 @@ function updateCPU(dt, gw) {
   // 조준 흔들림 갱신
   cpu.jitterTimer -= dt
   if (cpu.jitterTimer <= 0) {
-    cpu.jitterX = (Math.random() - 0.5) * 160  // ±80px 흔들림
-    cpu.jitterY = (Math.random() - 0.5) * 160
-    cpu.jitterTimer = 0.15 + Math.random() * 0.25
+    cpu.jitterX = (Math.random() - 0.5) * 110  // ±55px 흔들림
+    cpu.jitterY = (Math.random() - 0.5) * 110
+    cpu.jitterTimer = 0.13 + Math.random() * 0.22
   }
 
   g2.faceVisible = true
@@ -842,15 +842,15 @@ function updateCPU(dt, gw) {
     // 타겟 + 흔들림 위치로 조준
     const tx = target.x + cpu.jitterX
     const ty = target.y + cpu.jitterY
-    g2.crosshair.x += (tx - g2.crosshair.x) * Math.min(1, dt * 2.0)
-    g2.crosshair.y += (ty - g2.crosshair.y) * Math.min(1, dt * 2.0)
+    g2.crosshair.x += (tx - g2.crosshair.x) * Math.min(1, dt * 2.8)
+    g2.crosshair.y += (ty - g2.crosshair.y) * Math.min(1, dt * 2.8)
     g2.crosshair.visible = true
 
     // 조준이 충분히 가까우면 발사
     const dist = Math.hypot(g2.crosshair.x - target.x, g2.crosshair.y - target.y)
-    if (dist < 45 && cpu.shootCooldown <= 0 && g2.canShoot) {
+    if (dist < 55 && cpu.shootCooldown <= 0 && g2.canShoot) {
       tryShoot(g2, g2.crosshair.x, g2.crosshair.y)
-      cpu.shootCooldown = 0.5 + Math.random() * 0.5
+      cpu.shootCooldown = 0.3 + Math.random() * 0.4
     }
   } else if (!target) {
     // 적 없으면 중앙으로
