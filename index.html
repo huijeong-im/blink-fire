@@ -559,7 +559,7 @@ let leaderboard   = []
 let lbLoaded      = false
 let _scoreOverlayTimer = null
 
-let gameMode        = '1p'   // '1p' or '2p'
+let gameMode        = '1p-rank'  // '1p-rank' | '1p-cpu' | '2p'
 let twoPlayerWinner = 0      // 0=none 1=P1wins 2=P2wins 3=draw
 let cpuMode         = false  // true when 1P mode is running CPU opponent
 
@@ -656,8 +656,9 @@ function tryShoot(g, x, y, power=1) {
 
 window.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault() }
-  if (e.key==='1') gameMode='1p'
-  if (e.key==='2') gameMode='2p'
+  if (e.key==='1') gameMode='1p-rank'
+  if (e.key==='2') gameMode='1p-cpu'
+  if (e.key==='3') gameMode='2p'
 })
 
 // ─── ITEM LOGIC ──────────────────────────────────────────────────────────────
@@ -719,7 +720,7 @@ function startGame() {
   hideScoreOverlay()
   SFX.gameStart(); BGM.start()
   twoPlayerWinner = 0
-  cpuMode = gameMode === '1p'
+  cpuMode = gameMode === '1p-cpu'
   if (cpuMode) {
     cpu.target=null; cpu.reactTimer=0
     cpu.jitterX=0; cpu.jitterY=0; cpu.jitterTimer=0; cpu.shootCooldown=0
@@ -1066,19 +1067,29 @@ function drawStartScreen() {
   lines.forEach((l,i)=>{ drawText(l.t, cx-textW(l.t,l.s)/2, cy-110+i*22, l.c, l.s) })
   drawSprite('slime',cx-72,cy-58); drawSprite('bat',cx-12,cy-54); drawSprite('skeleton',cx+44,cy-58)
 
-  // 모드 선택 버튼
-  const m1='1P VS CPU', m2='2P VS', ms=3
-  const m1x=cx-110, m2x=cx+50, my=cy-8
-  const m1sel=gameMode==='1p', m2sel=gameMode==='2p'
-  // 선택된 모드 박스
-  ctx.strokeStyle=m1sel?'#00ff88':'#2a2a4a'; ctx.lineWidth=2
-  ctx.strokeRect(m1x-8,my-6,textW(m1,ms)+16,ms*5+12)
-  ctx.strokeStyle=m2sel?'#00e5ff':'#2a2a4a'
-  ctx.strokeRect(m2x-8,my-6,textW(m2,ms)+16,ms*5+12)
-  drawText(m1,m1x,my,m1sel?'#00ff88':'#444',ms)
-  drawText(m2,m2x,my,m2sel?'#00e5ff':'#444',ms)
+  // 모드 선택 버튼 (3개)
+  const ms=3
+  const modes=[
+    {key:'1p-rank', label:'RANKING', col:'#ffeb3b'},
+    {key:'1p-cpu',  label:'VS CPU',  col:'#00ff88'},
+    {key:'2p',      label:'2P VS',   col:'#00e5ff'},
+  ]
+  // 버튼 폭 계산 후 전체 가운데 정렬
+  const bGap=16
+  const bWidths = modes.map(m=>textW(m.label,ms)+16)
+  const totalW  = bWidths.reduce((a,b)=>a+b,0) + bGap*(modes.length-1)
+  let bx = cx - totalW/2
+  const my=cy-8
+  modes.forEach((m,i)=>{
+    const sel=gameMode===m.key
+    const bw=bWidths[i]
+    ctx.strokeStyle=sel?m.col:'#2a2a4a'; ctx.lineWidth=2
+    ctx.strokeRect(bx-0,my-6,bw,ms*5+12)
+    drawText(m.label, bx+8, my, sel?m.col:'#444', ms)
+    bx += bw + bGap
+  })
 
-  const hint2='PRESS 1 OR 2 TO SELECT', h2s=1
+  const hint2='PRESS 1  2  3 TO SELECT', h2s=1
   drawText(hint2, cx-textW(hint2,h2s)/2, my+ms*5+18, '#333', h2s)
 
   const st='BLINK LONG TO START', ss=3
